@@ -13,4 +13,4 @@ desktop_applaunchname = LSI-Storage-Fnos.Application
 service_port          = 2463
 checkport             = false
 os_min_version        = 1.2.0401
-changelog             = 0.3.0: 项目全面更名为 LSI-Storage-Fnos（应用标识、安装路径、数据目录、网关前缀、默认账号、文档全部统一）；默认登录账号由 raidview 改为 lsiadmin。注意：应用标识变更，旧版必须卸载重装，账号口令需重新设置。
+changelog             = 0.3.0: 项目全面更名为 LSI-Storage-Fnos（应用标识、安装路径、数据目录、网关前缀、默认账号、文档全部统一）；默认登录账号改为 lsiadmin。注意：应用标识变更，旧版必须卸载重装，账号口令需重新设置。
