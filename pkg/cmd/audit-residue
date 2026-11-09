@@ -1,0 +1,69 @@
+#!/bin/bash
+# 卸载残留审计（只读，不删除任何东西）
+# 用途：卸载前后各跑一次，确认平台与我们都清干净了。
+set -u
+APP=${RV_APPNAME:-raidview}
+[ -n "${1:-}" ] && APP=$1
+
+printf '%-46s %-10s %s\n' "位置" "状态" "大小/备注"
+printf '%-46s %-10s %s\n' "----------------------------------------------" "----------" "----------"
+
+chk() {   # chk <路径> <备注>
+  local p=$1 note=${2:-}
+  if [ -e "$p" ]; then
+    local sz; sz=$(du -sh "$p" 2>/dev/null | cut -f1)
+    printf '%-46s %-10s %s\n' "$p" "存在" "${sz}  ${note}"
+  else
+    printf '%-46s %-10s %s\n' "$p" "不存在" "${note}"
+  fi
+}
+
+echo "=== 一、应用目录（平台管理的）==="
+chk "/var/apps/$APP"            "平台：应用安装目录（uninstall 应删除）"
+echo
+echo "=== 二、@ 数据卷 ==="
+for d in appcenter appdata appconf apptemp apphome appmeta appshare; do
+  chk "/vol1/@$d/$APP"
+done
+echo
+echo "=== 三、运行时残留 ==="
+for f in "/var/run/$APP.sock" "/run/$APP.sock" "/var/run/$APP.pid"; do
+  chk "$f"
+done
+ls -d /tmp/${APP}* /tmp/*raidview* 2>/dev/null | while read -r t; do chk "$t" "临时物"; done
+echo
+echo "=== 四、端口占用（2463 门户 / 2464 LSA / 41000 后端 / 427 SLP）==="
+for p in 2463 2464 41000 427; do
+  if ss -lntu 2>/dev/null | grep -qE "[:.]$p\b"; then
+    owner=$(ss -lntup 2>/dev/null | grep -E "[:.]$p\b" | sed -E 's/.*users:\(\("([^"]+)".*/\1/' | head -1)
+    printf '  %-6s 监听中   %s\n' "$p" "${owner:-未知进程}"
+  else
+    printf '  %-6s 空闲\n' "$p"
+  fi
+done
+echo
+echo "=== 五、进程（按 /proc/PID/root 判定是否来自我们的 chroot）==="
+found=0
+for p in /proc/[0-9]*; do
+  r=$(readlink "$p/root" 2>/dev/null) || continue
+  case "$r" in *"/$APP/rootfs"*)
+    pid=${p#/proc/}
+    printf '  pid=%-8s root=%-42s %s\n' "$pid" "$r" "$(tr '\0' ' ' < "$p/cmdline" 2>/dev/null | cut -c1-50)"
+    found=1;;
+  esac
+done
+[ "$found" = 0 ] && echo "  无来自 $APP chroot 的进程"
+echo
+echo "=== 六、挂载残留 ==="
+m=$(awk -v a="$APP" '$2 ~ a' /proc/mounts 2>/dev/null | wc -l)
+echo "  与 $APP 相关的挂载点：$m"
+awk -v a="$APP" '$2 ~ a {print "    "$2"  <- "$1}' /proc/mounts 2>/dev/null | head -10
+
+echo
+echo "=== 结论 ==="
+if [ -d "/var/apps/$APP" ] || [ -d "/vol1/@appdata/$APP" ] || [ -d "/vol1/@appcenter/$APP" ]; then
+  echo "  仍有余留，见上表"
+else
+  echo "  主要目录已清空"
+fi
+echo "  说明：/vol1/@appmeta/$APP 由平台维护（应用元数据），卸载后是否保留属平台行为。"

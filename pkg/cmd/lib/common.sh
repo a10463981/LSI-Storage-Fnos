@@ -275,6 +275,33 @@ rv_lsa_set_readonly_group() {
   return 0
 }
 
+# 校验：口令真的能通过 PAM（shadow 哈希可复算），且账号未处于锁定态。
+# 这一步是为了把"设置成功但其实登不上"在设置阶段就拦住，而不是让用户到登录页才发现。
+rv_lsa_verify_password() {
+  local user=$1 pw=$2 st line
+  st=$(chroot "$RFS" passwd -S "$user" 2>/dev/null | awk '{print $2}')
+  if [ "$st" != "P" ]; then
+    rv_err "账号状态异常（passwd -S = ${st:-空}），期望 P"
+    return 1
+  fi
+  line=$(grep -E "^${user}:" "$RFS/etc/shadow" 2>/dev/null | head -1 | cut -d: -f2)
+  [ -n "$line" ] || { rv_err "shadow 里没有 ${user} 的口令字段"; return 1; }
+  python3 - "$line" "$pw" <<'PYEOF'
+import sys, crypt
+h, pw = sys.argv[1], sys.argv[2]
+try:
+    ok = crypt.crypt(pw, h) == h
+except Exception:
+    ok = False
+sys.exit(0 if ok else 1)
+PYEOF
+  if [ $? -ne 0 ]; then
+    rv_err "口令校验失败：写入 shadow 的哈希与口令不匹配"
+    return 1
+  fi
+  return 0
+}
+
 # 设置账号 + 口令（一次调用完成全部动作）
 #   用法: rv_lsa_set_password <account> <plaintext>
 rv_lsa_set_password() {
@@ -298,6 +325,12 @@ rv_lsa_set_password() {
   rv_set_account_name "$user" || { rv_err "写入 config.json 失败"; return 1; }
   if [ -n "$old" ] && [ "$old" != "$user" ]; then
     rm -f "$(rv_state_dir)/shadow.$old" 2>/dev/null || true
+  fi
+
+  # 设置完立刻自检：账号是否可用、哈希是否真的能复算
+  if ! rv_lsa_verify_password "$user" "$pw"; then
+    rv_err "自检未通过，口令未生效"
+    return 1
   fi
 
   grep -E "^${user}:" "$RFS/etc/shadow" > "$(rv_state_dir)/shadow.${user}" 2>/dev/null

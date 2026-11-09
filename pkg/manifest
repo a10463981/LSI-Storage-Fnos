@@ -1,5 +1,5 @@
 appname               = raidview
-version               = 0.2.3
+version               = 0.2.5
 display_name          = 博通控制器管理
 desc                  = <p><b>非官方第三方集成包，与 Broadcom Inc. 无隶属关系、未获其背书。</b></p><p>在本机内置 Broadcom LSI Storage Authority 运行环境，图形化查看 MegaRAID 虚拟盘与物理盘状态。只读，不提供任何写操作。</p>
 platform              = x86
@@ -13,4 +13,4 @@ desktop_applaunchname = raidview.Application
 service_port          = 2463
 checkport             = false
 os_min_version        = 1.2.0401
-changelog             = 0.2.3: 更名为「博通控制器管理」并更新图标；补上非官方第三方集成声明；其余同 0.2.2（账号名可自定义、面板入口修复）。
+changelog             = 0.2.5: 修复设置完成页渲染异常（CSS 里的 100% 与 % 格式化冲突导致响应中断）；其余同 0.2.4（设置后自检、完成页显示账号、登录耗时提示、残留审计脚本）。

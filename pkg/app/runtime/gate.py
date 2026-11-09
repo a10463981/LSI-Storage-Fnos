@@ -383,7 +383,44 @@ class H(BaseHTTPRequestHandler):
             return
 
         log("credential setup completed for account=%s (plaintext never logged)" % account)
-        self._send(303, b"", extra={"Location": self.base() + "/"})
+        self.setup_done(account)
+
+    def setup_done(self, account):
+        """设置成功后不要立刻 303 —— LSA 首次登录要 20~40 秒，
+        给一个明确的完成页，把账号名和等待预期写清楚，避免用户以为没生效而反复重试。"""
+        body = """<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>凭据已设置</title>
+<style>
+:root{--bg:#0f1115;--card:#171a21;--fg:#e6e9ef;--dim:#8b93a1;--ok:#3fb950;--line:#252a33;--acc:#4d9fe0}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+background:var(--bg);color:var(--fg);font:15px/1.7 system-ui,-apple-system,"Segoe UI","Noto Sans CJK SC",sans-serif;padding:24px}
+.card{width:min(560px,100%);background:var(--card);border:1px solid var(--line);border-radius:14px;padding:30px 28px}
+h1{margin:0 0 6px;font-size:20px}
+.tick{display:inline-flex;width:26px;height:26px;border-radius:50%;background:rgba(63,185,80,.15);
+color:var(--ok);align-items:center;justify-content:center;margin-right:9px;font-size:16px;vertical-align:-3px}
+.acct{margin:20px 0 6px;padding:14px 16px;background:#0b0d11;border:1px solid var(--line);border-radius:10px}
+.acct small{display:block;color:var(--dim);font-size:12.5px;margin-bottom:4px}
+.acct b{font:600 20px/1.3 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.4px;color:#fff}
+ul{margin:16px 0 0;padding-left:20px;color:var(--dim);font-size:13.5px}
+li{margin:7px 0}
+li b{color:var(--fg)}
+a.btn{display:inline-block;margin-top:22px;background:var(--acc);color:#08121c;text-decoration:none;
+font-weight:600;padding:11px 22px;border-radius:9px}
+a.btn:hover{filter:brightness(1.08)}
+</style></head><body><div class="card">
+<h1><span class="tick">&#10003;</span>凭据已设置</h1>
+<p style="color:var(--dim);margin:0 0 4px">账号与口令已写入运行环境，可以登录了。</p>
+<div class="acct"><small>登录账号名（登录 LSA 时填这个）</small><b>__ACCOUNT__</b></div>
+<ul>
+  <li>LSA 首次登录<b>需要 20–40 秒</b>（本机实测约 31 秒），请耐心等待，<b>不要重复点提交</b>。</li>
+  <li>如果提示 <b>Invalid Credentials</b>，先确认账号名与上面完全一致（区分大小写）。</li>
+  <li>忘记口令：在 fnOS 终端执行 <code>/var/apps/raidview/cmd/reset-password</code>，再重新打开应用。</li>
+</ul>
+<a class="btn" href="enter">进入 RAID 管理界面</a>
+</div></body></html>""".replace("__ACCOUNT__", account)
+        self._send(200, body.encode("utf-8"))
 
     def setup_fail(self, msg):
         # 不回显用户输入，只回显校验结论

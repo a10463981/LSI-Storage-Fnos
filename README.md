@@ -5,98 +5,65 @@
 > **本项目与 Broadcom Inc. 无隶属关系，未获其授权、赞助或背书。**
 >
 > - "Broadcom"、"LSI"、"MegaRAID"、"LSI Storage Authority (LSA)" 是 Broadcom Inc. 的商标或注册商标。
-> - 本仓库**不包含**任何 Broadcom 专有二进制（LSA 的 deb、`/opt/lsi` 下的一切、Ubuntu rootfs 均不在仓库中，也不在任何 Release 资产中）。
-> - 使用本项目前，你需要**自行**从 Broadcom 或你的服务器厂商处获取 LSA 安装包，并遵守你与 Broadcom 之间的许可条款。
-> - 图标中的 Broadcom 标识仅用于指明本应用所管理硬件的厂商；商标权归 Broadcom Inc. 所有。
->
-> 详见 [LICENSE](LICENSE) 中 "NOTE ON THIRD-PARTY SOFTWARE" 一节。
+> - 本**源码仓库**不包含任何 Broadcom 专有二进制（LSA 的 deb、`/opt/lsi` 下的一切、Ubuntu rootfs 均不在仓库中，也不在 git 历史里）。
+> - 详见 [LICENSE](LICENSE) 中 "NOTE ON THIRD-PARTY SOFTWARE" 一节。
 
-把 Broadcom LSI Storage Authority（LSA）的完整运行环境（Ubuntu 24.04 chroot）打进一个 fnOS 应用包，
+> ## 📦 关于本项目的 fpk 安装包
+>
+> **`raidview-*.fpk` 内含 Broadcom LSA 的专有二进制**（LSA 的 deb 包、`/opt/lsi` 下的全部组件、Ubuntu rootfs）。
+>
+> - 该 fpk 仅面向**个人使用**场景分发，用于在自己拥有的服务器上管理自己拥有的硬件。
+> - **它可能被 Broadcom Inc. 要求下架**，或由托管平台自行移除。若某天链接失效，属预期内。
+> - **源码仓库不含任何 Broadcom 二进制**。即使 Release 被下架，源码仍可继续维护。
+> - 你也可以**自备 LSA 安装包自行构建**，不依赖任何人提供的 fpk —— 见「构建前提」章节。
+>
+> 商标声明：Broadcom、LSI、MegaRAID、LSI Storage Authority 是 Broadcom Inc. 的商标或
+> 注册商标。本项目与 Broadcom Inc. **无隶属关系**，未获其授权、赞助或背书。
+
+把 Broadcom LSI Storage Authority（LSA）的完整运行环境（Ubuntu chroot）打进一个 fnOS 应用包，
 装完点开就是图形化的 MegaRAID 管理界面。**不需要 storcli，不需要在别处另装 LSA。**
 
-当前版本 **0.2.3**，已在真实 fnOS（Debian 12 系，`.15`）上跑通：安装 → 启动 → 预热门 → 登录 → 停止零残留。
+当前版本 **0.2.5**，已在真实 fnOS 上跑通：安装 → 启动 → 预热门 → 设置凭据 → 登录 → 停止零残留。
 
 ---
 
-## 这个项目能做什么、不能做什么
-
-| | |
-|---|---|
-| ✅ 支持 | **fnOS 裸机**且 RAID 卡在本机；**PVE/ESXi 整卡直通给 fnOS** |
-| ❌ 不支持 | fnOS 跑在虚拟机里、卡在宿主机上且未直通 —— 这种情况下 fnOS 内核看不到卡，chroot 里的 LSA 同样看不到 |
-| ❌ 不支持 | storcli 作为数据源（本项目的立场是：普通用户不会用命令行工具，只做图形界面） |
-| ⚠️ 未验证 | 有卡环境下的全部功能（控制器/VD/PD/重建/电池/事件）、`readonly_access_groups` 的真实拦截效果、`backup.exclude` 是否被平台执行 |
-
-**本应用只读**：不创建/删除阵列、不改缓存策略、不刷固件。但请注意 —— 它内置的是 Broadcom 的
-LSA 管理控制台，**LSA 本身具备写能力**；本项目的"只读"是指我们不提供写入口，不等于 LSA 被改造成只读。
-
----
-
-## 构建前提（重要）
-
-**本仓库不含 LSA 安装包，也无法提供。** 构建前你需要自己准备好：
-
-```
-008.018.012.000_MR_7.38_LSA_Linux.zip        # 约 166 MB
-```
-
-获取渠道（都需要你自己操作，任选其一）：
-
-- 你的服务器厂商支持页（Dell / HPE / 浪潮 / 华为…）搜 "LSI Storage Authority"，通常不需要注册
-- Broadcom 支持站 → MegaRAID 9460-8i 产品页 → Management Software（需要注册账号）
-
-拿到后放到 `build/vendor/`，或用环境变量指定：
+## 下载与安装（从 Release 拿 fpk）
 
 ```bash
-mkdir -p build/vendor && cp /path/to/008.018.012.000_MR_7.38_LSA_Linux.zip build/vendor/
-# 或
-LSA_ZIP=/path/to/xxx.zip make image
-```
-
-> 没有这个包，`make image` 会在第一阶段明确报错退出，不会产出半成品。
-
----
-
-## 构建与安装
-
-```bash
-make image     # 00→70：拉 rootfs → 装依赖 → 装 LSA → 打补丁 → 瘦身 → 冒烟 → 打载荷
-make pkg       # 组装 + fnpack
-# 产物：build/dist/raidview.fpk
-```
-
-需要：x86_64 Linux、root、能访问清华 TUNA 镜像、`fnpack`（fnOS 官方打包工具）。
-
-```bash
-# 装到 fnOS
-sudo appcenter-cli install-fpk raidview.fpk
+sudo appcenter-cli install-fpk raidview-0.2.5.fpk
 sudo /var/apps/raidview/cmd/main start
-curl -s http://127.0.0.1:2463/status
 ```
 
-首次打开会要求设置**登录账号与口令**（默认账号 `raidview`，可自定义）。
+也可以用 fnOS 应用中心的「手动安装 fpk」。
 
----
+### 安装前提
 
-## 目录结构
+| 项 | 要求 |
+|---|---|
+| 系统 | fnOS（x86_64），已在 1.2.x 上验证 |
+| CPU | 无需 AVX/AVX2/SSE4.2（基线 gcc 8.3.x，专为虚拟 CPU 兼容） |
+| 权限 | 应用以 **root** 运行（要挂载 chroot、起 nginx/slpd） |
+| 磁盘 | 安装后约 **400 MB**（`@appcenter` 67MB + `@appdata` 172MB + 解包余量） |
+| 内存 | 运行期实测约 **30 MB** |
+| 硬件 | **需要 MegaRAID 卡**且本机内核能看到。**没卡也能装、能打开**，界面会提示"未检测到控制器" |
+| 端口 | 2463 门户 / 2464 LSA 前端 / 41000 内部 / 427 SLP |
 
-```
-build/     七阶段构建流水线 + 两个静态守卫（ELF 依赖 / 挂载安全）
-pkg/       fpk 源：manifest、9 个生命周期钩子、运行时、web、安装向导
-dev/       不装包直接验证运行环境的脚本
-docs/      有卡环境验证清单
-```
+> **不支持**：fnOS 跑在虚拟机里、RAID 卡在宿主机且未直通（内核看不到卡，内置 LSA 同样看不到）。
 
----
+### 首次使用
 
-## 许可证
+装完点开应用，**第一屏就是「设置登录口令」**：填账号名（默认 `raidview`，可改）+ 口令（≥8 位，两次一致）
+→ 勾选「我已记下」→ 提交 → **完成页会大字显示你的账号名，登录 LSA 时要填这个**。
 
-代码部分 **MIT**（见 [LICENSE](LICENSE)）。
-LSA、Ubuntu rootfs、Broadcom 商标**不在** MIT 覆盖范围内，权利归各自所有者。
+> **首次登录 LSA 需 20–40 秒**（实测 31 秒），期间无反馈属正常，**不要重复提交**。
+
+忘记口令：`sudo /var/apps/raidview/cmd/reset-password`，再重新打开应用重设。
 
 ---
 
 # 以下为实现细节与踩坑记录
+
+# raidview · fnOS 内置 LSA 的 MegaRAID 监控应用
 
 把 Broadcom LSI Storage Authority 的完整运行环境（Ubuntu 24.04 chroot）打进 fpk，
 装到 fnOS 上点开就能看到图形界面。**不依赖 storcli，不在别处另装 LSA，装完即用。**
@@ -588,6 +555,82 @@ broker 拿到之后把 `X-Trim-Username`、`X-Trim-Isadmin` 这些**HTTP 头**�
 - 若将来要做，实现路径与前置条件写在这里：① 真卡环境验证 `readonly_access_groups` 确实拦住写操作；
   ② gate 读取 `X-Trim-Username`/`X-Trim-Isadmin` 做身份判定；③ 口令改为可逆存储并加会话代理；
   ④ 默认仍只对 `X-Trim-Isadmin: 1` 的用户放行，且直连端口仍要求口令。
+
+### 8.3 登录相关：耗时、自检与"Invalid Credentials"排查（0.2.4/0.2.5）
+
+#### LSA 首次登录很慢——这是本机实测数据，不是猜
+
+```
+POST /1.0/servers/<displayId>/login   = 30888 ms      ← 约 31 秒
+GET  /1.0/servers/<displayId>/login   = 5129 ms
+```
+
+在 3.8G 内存、无卡的小机器上，**登录一次要 31 秒**。期间界面没有任何反馈，
+很容易被当成"没反应/失败了"，然后重复提交。
+
+0.2.4 起：设置完成页与设置页都明确写「首次登录需 20–40 秒，请勿重复提交」。
+
+#### 设置后立刻自检（0.2.4）
+
+`rv_lsa_set_password` 在写完账号口令后**当场验证**，不通过就把错误返回给设置页：
+
+1. `passwd -S <账号>` 必须是 `P`（可用），不能是 `L`（锁定）
+2. shadow 里的哈希必须能用该口令复算出同一串（等价于 PAM 校验）
+
+这样"设置看起来成功、登录却失败"的情况会在设置阶段就被拦住，而不是让用户到 LSA 登录页才发现。
+
+#### 「Invalid Credentials」的排查结论（重要，如实记录）
+
+用户报告：安装时不设密码 → 首启设置页设密码 → LSA 登录报 `Invalid Credentials`（49）。
+
+**在 0.2.3 上三种场景全部实测通过，无法复现**：
+
+| 场景 | 做法 | 结果 |
+|---|---|---|
+| 2 | 安装（不走向导）→ 自动拉起并 READY → `/setup` 设 `t1` → 浏览器真实登录 | ✅ 进入 "Select Controller t1" |
+| 2' | 同上，但用**默认账号名** `raidview` | ✅ 进入 "Select Controller raidview" |
+| 2'' | 设完后**完整重启**（stop→start）再登录 | ✅ 仍然成功 |
+| 3 | 卸载 → 全新安装 → `/setup` 设 `scen3user` → 登录 | ✅ 进入 "Select Controller scen3user" |
+
+**因此"LSA 启动时缓存 OS 用户库"这个假设被证伪**——账号在 LSA 运行中途创建、设口令，
+立刻就能登录，不需要重启 LSA。所以**没有**加入"设置后重启后端"的逻辑（那会带来
+WARMING 期间重启的时序风险，而收益是零）。
+
+目前最可能的两个解释（尚未被用户侧证据确认）：
+
+1. **版本差异**：用户当时装的可能是 0.1.x / 早期 0.2.x，那些版本的 `/setup` 流程与现在不同。
+2. **账号名不一致**：设置时改了账号名，登录时却按默认的 `raidview` 输入。
+   → 0.2.4 的完成页把账号名用大字显示出来，正是为了避免这个。
+
+如果再次遇到，按这个顺序二分：
+`passwd -S <账号>`（要 `P`）→ 哈希复算 → 浏览器 F12 看 `POST /1.0/servers/<id>/login`
+耗时是否 >40 秒（超时就等，不要重复提交）。
+
+#### 卸载残留审计（回答"卸载干不干净"）
+
+0.2.4 起内置只读审计脚本：
+
+```bash
+sudo /var/apps/raidview/cmd/audit-residue
+```
+
+**实测（`.15`，真实卸载后跑）**：
+
+```
+/var/apps/raidview            不存在          ← 平台删除
+/vol1/@appcenter/raidview     不存在          ← 67M，已清理
+/vol1/@appdata/raidview       不存在          ← 172M，我们在 uninstall_callback 里删
+/vol1/@apptemp/raidview       不存在
+/vol1/@appconf/raidview       存在  4.0K      ← 平台保留（应用配置元数据）
+/vol1/@apphome/raidview       存在  0         ← 平台保留（空目录）
+/vol1/@appmeta/raidview       存在  0         ← 平台保留（应用元数据）
+端口 2463/2464/41000/427      全部空闲
+来自 chroot 的进程            无
+挂载残留                      0
+```
+
+**结论：我们自己的东西（约 239MB）卸载后全部清空**；剩下三个空目录/4K 是 fnOS 平台
+自己维护的应用元数据，属平台行为，不是我们的残留。
 
 ---
 
