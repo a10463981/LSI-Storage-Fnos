@@ -1,0 +1,3 @@
+#!/bin/bash
+# config_callback：配置保存后的回调。暂无需要处理的动作。
+exit 0

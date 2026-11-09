@@ -1,0 +1,59 @@
+#!/bin/bash
+# install_callback：安装后解包运行环境。重活都在这里。
+set -u
+CMD_DIR=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+# shellcheck disable=SC1091
+. "$CMD_DIR/lib/common.sh"
+# shellcheck disable=SC1091
+. "$CMD_DIR/lib/lifecycle.sh"
+
+echo "== 部署运行环境 =="
+mkdir -p "$VAR" "$RUN"
+
+rv_extract_rootfs || { echo "解包失败，安装未完成" >&2; exit 1; }
+
+# 缺省配置只在不存在时写入，升级不覆盖用户改动
+if [ ! -f "$CONF_FILE" ]; then
+  cat > "$CONF_FILE" <<'EOF'
+# raidview 配置。改完需重启应用生效。
+gate_port=2463
+front_port=2464
+EOF
+  echo "已写入默认配置 $CONF_FILE"
+fi
+
+chmod 755 "$RV_TARGET/runtime/launch.sh" 2>/dev/null || true
+chmod 755 "$RV_TARGET/runtime/gate.py" 2>/dev/null || true
+
+echo "部署完成。rootfs 占用 $(du -sm "$RFS" 2>/dev/null | cut -f1) MB"
+
+# 登录口令：优先用 fnOS 原生安装向导里填的值（平台以 wizard_<field> 环境变量传入）
+# 用户没填（或平台没走向导）就不设——首次打开门户时会进入「设置登录口令」页。
+# 注意：绝不回显口令内容。
+WIZ_ACCT="${wizard_login_account:-}"
+[ -n "$WIZ_ACCT" ] || WIZ_ACCT="$RV_DEFAULT_USER"
+if [ -n "${wizard_login_password:-}" ]; then
+  if rv_lsa_set_password "$WIZ_ACCT" "${wizard_login_password}"; then
+    echo "已按安装向导设置登录账号 ${WIZ_ACCT} 与口令"
+  else
+    echo "向导口令写入失败，首次打开应用时会再次要求设置"
+  fi
+else
+  echo "未在安装向导中设置口令：首次打开应用时会引导你设置"
+fi
+
+# 装完就尝试拉起来：用户点图标时的第一反应是"能不能打开"，
+# 而不是"我还要先去点启动"。start 是幂等的，平台之后自己再调一次也没副作用。
+# 注意：这里**绝不能因为启动失败就让 install_callback 返回非 0**——
+# 平台会把钩子非零当成安装失败（实测 code 10237），进而触发自动卸载。
+echo "尝试启动服务…"
+# 关键：安装钩子跑在**暂存目录**里，直接用 $RV_CMD_DIR/main 会把暂存路径带进运行期
+# （应用名会变成 <appname>-<version>-tpk）。装完之后正式路径已就位，优先用它。
+REAL_MAIN="/var/apps/$RV_APPNAME/cmd/main"
+if [ -x "$REAL_MAIN" ]; then
+  "$REAL_MAIN" start >/dev/null 2>&1 || echo "启动未成功（不影响安装，可在应用管理里手动启动）"
+else
+  "$RV_CMD_DIR/main" start >/dev/null 2>&1 || echo "启动未成功（不影响安装，可在应用管理里手动启动）"
+fi
+echo "访问 http://<本机IP>:2463/ 查看"
+exit 0

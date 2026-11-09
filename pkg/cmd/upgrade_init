@@ -1,0 +1,13 @@
+#!/bin/bash
+# upgrade_init：升级前停服务。不移动目录（真正的替换在 callback 里做，带回滚）。
+# 平台顺序（实测）：upgrade_init → 解包新包 → upgrade_callback
+set -u
+CMD_DIR=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+# shellcheck disable=SC1091
+. "$CMD_DIR/lib/common.sh"
+# shellcheck disable=SC1091
+. "$CMD_DIR/lib/lifecycle.sh"
+echo "== 升级前停止服务 =="
+rv_stop_all
+echo "已停止（rootfs 尚未改动）"
+exit 0

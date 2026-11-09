@@ -1,0 +1,67 @@
+#!/bin/bash
+# install_init：安装前的只读检查。不落任何文件。
+# 平台顺序（实测）：install_init → 解包 app.tgz → install_callback。
+# 所以此刻 target/ 还不存在，**不能在这里检查载荷**。
+set -u
+CMD_DIR=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+# shellcheck disable=SC1091
+. "$CMD_DIR/lib/common.sh"
+# shellcheck disable=SC1091
+. "$CMD_DIR/lib/lifecycle.sh"
+
+echo "== 安装前检查 =="
+fail=0
+
+# --- 1. CPU 架构与最低指令集 ---------------------------------------------
+# 内置的是 Broadcom 的 LSA 二进制（gcc_8.3.x 基线，本仓库唯一可用的组合）。
+# 实测：gcc_14.2.x / gcc_11.2.x 的产物要求更高 ISA，在 QEMU 的
+# "Common KVM processor"（无 AVX/AVX2/SSE4.2）上直接报
+#   nginx: CPU ISA level is lower than required
+# 所以这里只校验 x86-64 基线指令。理论上几乎不可能缺失，但一旦缺失
+# 就必须在**安装阶段**报错，而不是让用户装完点开才发现起不来。
+arch=$(uname -m)
+if [ "$arch" != "x86_64" ]; then
+  echo "本机架构是 $arch，本应用只提供 x86_64 版本。" >&2
+  fail=1
+else
+  miss=""
+  for f in sse2 cmov cx8 fxsr; do
+    grep -qw "$f" /proc/cpuinfo || miss="$miss $f"
+  done
+  if [ -n "$miss" ]; then
+    echo "本机 CPU 指令集不支持：缺少$miss" >&2
+    echo "内置的 LSA 二进制需要 x86-64 基线指令集（SSE2 等）。" >&2
+    echo "常见于极老的 CPU 或过度精简的虚拟机 CPU 模型。" >&2
+    fail=1
+  else
+    # 顺带把"有没有 AVX"记进日志：它决定更高基线能否使用，也是排障线索
+    if grep -qw avx2 /proc/cpuinfo; then isa="x86-64 + AVX2"
+    elif grep -qw avx /proc/cpuinfo; then isa="x86-64 + AVX"
+    else isa="x86-64 基线（无 AVX）"; fi
+    echo "CPU 检查通过：$arch，$isa"
+  fi
+fi
+
+# --- 2. 依赖命令 -----------------------------------------------------------
+command -v python3 >/dev/null 2>&1 || { echo "缺少 python3：门户页依赖它。" >&2; fail=1; }
+command -v unshare >/dev/null 2>&1 || { echo "缺少 unshare（util-linux）：启动器需要它创建私有挂载命名空间。" >&2; fail=1; }
+command -v chroot  >/dev/null 2>&1 || { echo "缺少 chroot。" >&2; fail=1; }
+
+# --- 3. 空间 ---------------------------------------------------------------
+rv_check_space 1024 || fail=1
+
+# --- 4. chroot 能力（无副作用探测） ----------------------------------------
+if chroot / /bin/true 2>/dev/null; then
+  echo "chroot(2) 可用"
+else
+  echo "chroot(2) 不可用 —— 本应用依赖 chroot，安装无法进行" >&2
+  fail=1
+fi
+
+if [ "$fail" != 0 ]; then
+  echo "检查未通过，安装中止" >&2
+  exit 1
+fi
+echo "载荷校验推迟到 install_callback（此刻 app.tgz 尚未解包）"
+echo "检查通过"
+exit 0

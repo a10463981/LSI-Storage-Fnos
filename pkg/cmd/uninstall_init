@@ -1,0 +1,19 @@
+#!/bin/bash
+# uninstall_init：卸载前必须停干净，否则残留进程/挂载会让后续重装出怪问题。
+set -u
+CMD_DIR=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+. "$CMD_DIR/lib/common.sh"
+. "$CMD_DIR/lib/lifecycle.sh"
+echo "== 卸载前清理 =="
+rv_stop_all
+
+bad=0
+[ -n "$(rv_procs_in_root "$RFS")" ] && { echo "仍有 chroot 内进程" >&2; bad=1; }
+left=$(awk -v p="$RFS" '$2 ~ p {print $2}' /proc/mounts 2>/dev/null)
+[ -n "$left" ] && { echo "仍有挂载: $left" >&2; bad=1; }
+cfg_load
+for p in "$(cfg_get gate_port 2463)" "$(cfg_get front_port 2464)"; do
+  rv_port_listen "$p" && { echo "端口 $p 仍被占用" >&2; bad=1; }
+done
+[ "$bad" = 0 ] && echo "已确认无进程/挂载/端口残留"
+exit 0

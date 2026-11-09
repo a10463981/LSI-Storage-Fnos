@@ -1,0 +1,3 @@
+#!/bin/bash
+# config_init：配置界面打开前的准备。本应用暂无平台配置项（配置在 $VAR/config 里手改）。
+exit 0

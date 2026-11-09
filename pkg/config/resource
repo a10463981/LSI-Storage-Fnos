@@ -1,0 +1,15 @@
+{
+    "backup": {
+        "enabled": true,
+        "check_storage": true,
+        "exclude": {
+            "@appcenter": ["rootfs.tar.gz"],
+            "@appdata": ["rootfs/", "logs/", "run/", "*.log", "*.pid"],
+            "@apptemp": [],
+            "@apphome": [],
+            "@appconf": [],
+            "@appmeta": ["cache/"],
+            "@appshare": []
+        }
+    }
+}

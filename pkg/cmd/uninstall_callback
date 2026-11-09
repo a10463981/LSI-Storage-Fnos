@@ -1,0 +1,27 @@
+#!/bin/bash
+# uninstall_callback：删除运行环境。
+#
+# 实测：平台卸载时会删掉 /var/apps/<name>，但**保留 @appdata/<name>**（用户数据目录）。
+# 我们的 rootfs 就在 @appdata 里，268MB 全留着没有意义，所以这里主动清掉。
+# 删除前做路径安全校验：只删 basename 等于应用名、且确实位于 @appdata 下的目录，
+# 避免变量为空时误删。
+set -u
+CMD_DIR=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+# shellcheck disable=SC1091
+. "$CMD_DIR/lib/common.sh"
+# shellcheck disable=SC1091
+. "$CMD_DIR/lib/lifecycle.sh"
+
+echo "== 删除运行环境 =="
+rv_stop_all
+rm -rf "$RFS" "${RFS}.prev"
+rm -f "$RUN"/*.pid "$RUN"/stop.flag 2>/dev/null || true
+
+# 安全删除 @appdata/<name>
+if [ -n "${VAR:-}" ] && [ "$(basename "$VAR")" = "$RV_NAME" ] && [ -d "$VAR" ]; then
+  echo "清理运行态目录 $VAR（$(du -sh "$VAR" 2>/dev/null | cut -f1)）"
+  rm -rf "$VAR" || echo "清理失败（权限或平台限制），可手工删除：$VAR" >&2
+fi
+
+echo "已删除 $RFS"
+exit 0

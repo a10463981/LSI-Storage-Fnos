@@ -1,0 +1,18 @@
+{
+    ".url": {
+        "raidview.Application": {
+            "title": "MegaRAID 监控",
+            "icon": "images/icon_{0}.png",
+            "type": "iframe",
+            "protocol": "",
+            "gatewayPrefix": "/app/raidview",
+            "gatewaySocket": "app.sock",
+            "port": "",
+            "url": "/app/raidview",
+            "allUsers": false,
+            "control": {
+                "accessPerm": "readonly"
+            }
+        }
+    }
+}

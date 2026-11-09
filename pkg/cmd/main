@@ -1,0 +1,183 @@
+#!/bin/bash
+# fpk 生命周期入口：main start|stop|status
+#
+# 退出码语义（与平台模板一致，实测自 fnpack create 生成的 cmd/main）：
+#   start  → 0 成功 / 1 失败
+#   stop   → 0 成功 / 1 失败
+#   status → 0 运行中 / 3 未运行
+#
+# ★ 纪律：start 只要把 supervisor 拉起来了就返回 0。
+#   LSA 未就绪、无卡、预热中都不是"启动失败"——那些状态由 /status 反映给门户页。
+#   平台会把 main 的非零退出当成应用异常（安装期甚至可能触发自动卸载），
+#   所以"起来了但还没就绪"绝不能返回非零。
+set -u
+CMD_DIR=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+# shellcheck disable=SC1091
+. "$CMD_DIR/lib/common.sh"
+# shellcheck disable=SC1091
+. "$CMD_DIR/lib/preflight.sh"
+# shellcheck disable=SC1091
+. "$CMD_DIR/lib/lifecycle.sh"
+
+do_start() {
+  cfg_load
+  local FRONT GATE
+  FRONT=$(cfg_get front_port 2464)
+  GATE=$(cfg_get gate_port 2463)
+
+  # 幂等：已在运行直接成功——但先核对它的 GATE_PREFIX 是否与当前应用名一致。
+  # 安装期启动的 gate 可能带着暂存目录的名字（/app/<name>-<ver>-tpk），
+  # 那样面板访问 /app/<appname> 会全部 404，必须自愈。
+  if rv_alive "$RUN/gate.pid" && rv_port_listen "$GATE"; then
+    _gp=$(tr '\0' '\n' < "/proc/$(cat "$RUN/gate.pid" | tr -d '[:space:]')/environ" 2>/dev/null | sed -n 's/^GATE_PREFIX=//p')
+    if [ -n "$_gp" ] && [ "$_gp" != "/app/$RV_APPNAME" ]; then
+      rv_say "检测到 gate 前缀不匹配（$_gp ≠ /app/$RV_APPNAME），重启门户"
+      rv_kill_pidfile "$RUN/gate.pid"
+      rm -f "$RV_TARGET/app.sock" 2>/dev/null || true
+    else
+      rv_say "已在运行（gate :$GATE）"
+      return 0
+    fi
+  fi
+
+  rv_recover_prev   # 上次升级中途失败留下的回滚点，先恢复
+
+  # rootfs 不在就地补装（正常情况下 install_callback 已做过）
+  if [ ! -x "$RFS/opt/lsi/LSIStorageAuthority/bin/LSA" ]; then
+    rv_say "运行环境缺失，尝试就地部署…"
+    rv_extract_rootfs || { rv_err "运行环境部署失败"; return 1; }
+  fi
+
+  preflight || { rv_err "启动前检查未通过"; return 1; }
+
+  local BACK
+  BACK=$(rv_pick_port) || { rv_err "找不到空闲后端端口"; return 1; }
+  rv_lsa_inject_ports "$FRONT" "$BACK" || { rv_err "端口注入失败，配置结构可能已变化"; return 1; }
+  rv_say "端口: 门户=$GATE 前端=$FRONT 后端=$BACK(lo)"
+
+  rv_lsa_ensure_account
+  # 只重放**已保存**的口令哈希（升级替换 rootfs 后必需）。
+  # 若还没有口令，这里什么都不做——交给安装向导或门户的「设置登录口令」页，
+  # 不再像 0.1.7 之前那样自动生成一个"只显示一次"的随机串。
+  if rv_lsa_apply_saved_password; then
+    rv_say "已重放登录口令"
+  else
+    rv_say "尚未设置登录口令（门户会引导用户设置）"
+  fi
+  rv_prune_logs 128
+
+  # 1) LSA（独立 mount 命名空间）
+  rm -f "$RUN/stop.flag"
+  if rv_alive "$RUN/lsa.ns.pid"; then
+    rv_say "LSA 启动器已在运行"
+  else
+    : > "$LOGDIR/lsa.log"
+    nohup "$RV_TARGET/runtime/launch.sh" "$RFS" "$RUN" >>"$LOGDIR/lsa.log" 2>&1 &
+    echo $! > "$RUN/lsa.pid"
+    rv_say "LSA 启动器 pid=$(cat "$RUN/lsa.pid")"
+  fi
+
+  # 2) 门户
+  if rv_alive "$RUN/gate.pid"; then
+    rv_say "门户已在运行"
+  else
+    GATE_PORT="$GATE" FRONT_PORT="$FRONT" RFS="$RFS" RUN="$RUN" \
+      STATE="$(rv_state_dir)" APP_CMD="$RV_CMD_DIR/main" \
+      SOCK_PATH="$RV_TARGET/app.sock" GATE_PREFIX="/app/$RV_APPNAME" \
+      nohup python3 "$RV_TARGET/runtime/gate.py" >>"$LOGDIR/gate.out" 2>&1 &
+    echo $! > "$RUN/gate.pid"
+    local i
+    for i in $(seq 1 20); do rv_port_listen "$GATE" && break; sleep 0.3; done
+    if ! rv_alive "$RUN/gate.pid"; then
+      rv_err "门户启动失败，见 $LOGDIR/gate.out"
+      tail -20 "$LOGDIR/gate.out" 2>/dev/null >&2
+      return 1
+    fi
+    rv_say "门户 pid=$(cat "$RUN/gate.pid") 监听 :$GATE"
+  fi
+
+  rv_say "已启动。访问 http://<本机IP>:$GATE/"
+  return 0
+}
+
+do_stop() {
+  cfg_load
+  local FRONT GATE
+  FRONT=$(cfg_get front_port 2464)
+  GATE=$(cfg_get gate_port 2463)
+  rv_say "停止中…"
+
+  # ★ 先停门户，避免它在停止过程中干扰判断
+  rv_kill_pidfile "$RUN/gate.pid"
+  rm -f "$RV_TARGET/app.sock" 2>/dev/null || true   # 残留 socket 会挡住下次 bind
+
+  # ★ 优雅停 LSA：置停止标记，由命名空间内常驻 shell 调 init 脚本（不用 nsenter）
+  touch "$RUN/stop.flag"
+  if [ -f "$RUN/lsa.ns.pid" ]; then
+    local pid i
+    pid=$(cat "$RUN/lsa.ns.pid" 2>/dev/null | tr -d '[:space:]')
+    for i in $(seq 1 60); do
+      if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then break; fi
+      sleep 0.5
+    done
+  fi
+  rv_kill_pidfile "$RUN/lsa.pid"
+  rm -f "$RUN/lsa.ns.pid"
+
+  # ★ 兜底：chroot 内进程 cmdline 不含宿主路径，按 /proc/PID/root 判定归属
+  rv_procs_kill_in_root "$RFS"
+
+  # 命名空间销毁后挂载应自动消失；这里只做确认与极端兜底
+  local left
+  left=$(awk -v p="$RFS" '$2 ~ p {print $2}' /proc/mounts 2>/dev/null)
+  if [ -n "$left" ]; then
+    rv_say "清理残留挂载: $(echo $left | tr '\n' ' ')"
+    echo "$left" | sort -r | while read -r m; do
+      umount -l "$m" 2>/dev/null || umount -f "$m" 2>/dev/null || true
+    done
+  fi
+
+  local bad=0
+  rv_port_listen "$GATE"  && { rv_err "端口 $GATE 仍在监听"; bad=1; }
+  rv_port_listen "$FRONT" && { rv_err "端口 $FRONT 仍在监听"; bad=1; }
+  [ -n "$(rv_procs_in_root "$RFS")" ] && { rv_err "chroot 内仍有残留进程"; bad=1; }
+  if [ "$bad" = 1 ]; then rv_say "停止完成但存在残留"; return 1; fi
+  rv_say "已完全停止，端口与进程均无残留"
+  return 0
+}
+
+do_status() {
+  cfg_load
+  local GATE; GATE=$(cfg_get gate_port 2463)
+  local gate_ok=0 lsa_ok=0
+  rv_alive "$RUN/gate.pid" && gate_ok=1
+  rv_alive "$RUN/lsa.ns.pid" && lsa_ok=1
+
+  if [ $gate_ok -eq 0 ] && [ $lsa_ok -eq 0 ]; then
+    echo "stopped"; return 3
+  fi
+  if [ $gate_ok -eq 1 ] && rv_port_listen "$GATE"; then
+    echo "running (gate :$GATE)"; return 0
+  fi
+  echo "abnormal (gate=$gate_ok lsa=$lsa_ok)"; return 3
+}
+
+# 由门户（gate.py）或安装钩子调用，明文经 stdin 传入，绝不进 argv
+do_set_password() {
+  local acct=${1:-}
+  local pw=""
+  IFS= read -r pw || true
+  pw=${pw%$'\r'}
+  [ -n "$acct" ] || acct=$(rv_account_name)
+  rv_lsa_set_password "$acct" "$pw"
+  return $?
+}
+
+case "${1:-}" in
+  start)   do_start;  exit $? ;;
+  set-password) shift; do_set_password "${1:-}"; exit $? ;;
+  stop)    do_stop;   exit $? ;;
+  status)  do_status; exit $? ;;
+  restart) do_stop; sleep 1; do_start; exit $? ;;
+  *) echo "用法: $0 {start|stop|status|restart|set-password}"; exit 1 ;;
+esac

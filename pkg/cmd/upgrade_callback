@@ -1,0 +1,16 @@
+#!/bin/bash
+# upgrade_callback：替换 rootfs，带失败回滚。
+set -u
+CMD_DIR=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+# shellcheck disable=SC1091
+. "$CMD_DIR/lib/common.sh"
+# shellcheck disable=SC1091
+. "$CMD_DIR/lib/lifecycle.sh"
+echo "== 升级：替换运行环境（保留回滚点） =="
+rv_check_space 1024 || { echo "空间不足，升级中止（旧版本仍可用）" >&2; exit 1; }
+if ! rv_upgrade_rootfs; then
+  echo "升级失败，已回滚到旧版本" >&2
+  exit 1
+fi
+echo "升级完成。请在应用管理中启动。"
+exit 0

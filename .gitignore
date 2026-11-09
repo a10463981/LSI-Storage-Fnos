@@ -1,0 +1,18 @@
+# ---- 绝不入库：Broadcom 专有二进制 ----
+build/vendor/
+build/vendor/*
+*.zip
+build/work/
+build/dist/
+build/logo-src/
+pkg/app/rootfs.tar.gz
+pkg/app/.payload.json
+
+# ---- 构建产物 ----
+*.fpk
+*.tar.gz
+*.tar.zst
+
+# ---- Python ----
+__pycache__/
+*.pyc
