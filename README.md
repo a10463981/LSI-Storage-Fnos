@@ -27,6 +27,19 @@
 
 ---
 
+## 界面预览
+
+以下截图取自实际运行的 fnOS 环境。
+
+<p>
+<img src="docs/screenshots/screenshot-1.png" width="49%">
+<img src="docs/screenshots/screenshot-2.png" width="49%">
+</p>
+
+<img src="docs/screenshots/screenshot-3.png" width="100%">
+
+---
+
 ## 下载与安装（从 Release 拿 fpk）
 
 ```bash
