@@ -1,5 +1,5 @@
 #!/bin/bash
-# raidview 运行时公共库。被 cmd/ 下所有钩子 source。
+# LSI-Storage-Fnos 运行时公共库。被 cmd/ 下所有钩子 source。
 #
 # 目录模型（与 fnOS 平台约定一致，实测自 /var/apps/<name>/）：
 #   /var/apps/<name>/cmd/            ← 本目录（钩子与 main）
@@ -15,8 +15,8 @@ RV_NAME=$(basename "$RV_APP_ROOT")
 # 真正的应用名以 manifest 的 appname 为准。
 # 为什么会不一致：install_callback 运行在**安装暂存目录**里
 # （/vol1/appcenter-downloads/<appname>-<version>-tpk/），那一刻
-# basename(dirname(cmd)) 是 "raidview-0.1.9-tpk" 而不是 "raidview"。
-# 曾因此把 GATE_PREFIX 算成 /app/raidview-0.1.9-tpk，导致面板访问 /app/raidview 全部 404。
+# basename(dirname(cmd)) 是 "LSI-Storage-Fnos-0.1.9-tpk" 而不是 "LSI-Storage-Fnos"。
+# 曾因此把 GATE_PREFIX 算成 /app/LSI-Storage-Fnos-0.1.9-tpk，导致面板访问 /app/LSI-Storage-Fnos 全部 404。
 RV_APPNAME="$RV_NAME"
 for _mf in "$RV_APP_ROOT/manifest" "/var/apps/$RV_NAME/manifest"; do
   if [ -f "$_mf" ]; then
@@ -46,8 +46,8 @@ fi
 RFS=${RFS:-$VAR/rootfs}
 RUN=${RUN:-$VAR/run}
 LOGDIR=${LOGDIR:-$VAR/logs}
-CONF_FILE=${CONF_FILE:-$ETC/raidview.conf}
-LOG=$LOGDIR/raidview.log
+CONF_FILE=${CONF_FILE:-$ETC/LSI-Storage-Fnos.conf}
+LOG=$LOGDIR/LSI-Storage-Fnos.log
 
 mkdir -p "$RUN" "$LOGDIR" "$VAR/state" 2>/dev/null || true
 
@@ -155,12 +155,12 @@ rv_lsa_inject_ports() {
 }
 
 rv_lsa_ensure_account() {
-  grep -qE '^raidview:' "$RFS/etc/shadow" 2>/dev/null || rv_err "chroot 内缺少账号 raidview"
+  grep -qE '^lsiadmin:' "$RFS/etc/shadow" 2>/dev/null || rv_err "chroot 内缺少账号 lsiadmin"
   return 0
 }
 
 # ---------- 登录账号与口令 ----------
-# 账号名不再是固定常量：用户可以在「设置登录口令」页自己指定（默认 raidview）。
+# 账号名不再是固定常量：用户可以在「设置登录口令」页自己指定（默认 LSI-Storage-Fnos）。
 # 账号落在 chroot 内（LSA 用 OS 认证），名字记在 $VAR/config.json。
 #
 # 状态文件（$VAR/state/）：
@@ -168,7 +168,7 @@ rv_lsa_ensure_account() {
 #   credential-setup-done    "已经拥有可用账号与口令"
 #   setup-in-progress        防并发提交的锁
 
-RV_DEFAULT_USER=raidview
+RV_DEFAULT_USER=lsiadmin
 RV_CONFIG_JSON='{}'
 
 rv_state_dir()    { echo "$VAR/state"; }
@@ -261,7 +261,7 @@ rv_lsa_ensure_account_named() {
 rv_lsa_set_readonly_group() {
   local user=$1 conf="$RFS/opt/lsi/LSIStorageAuthority/conf/LSA.conf"
   [ -f "$conf" ] || { rv_err "缺少 LSA.conf"; return 1; }
-  [ -f "$conf.raidview.bak" ] || cp -a "$conf" "$conf.raidview.bak" 2>/dev/null || true
+  [ -f "$conf.LSI-Storage-Fnos.bak" ] || cp -a "$conf" "$conf.LSI-Storage-Fnos.bak" 2>/dev/null || true
   if grep -qE '^[[:space:]]*readonly_access_groups[[:space:]]*=' "$conf"; then
     sed -i -E "s#^([[:space:]]*readonly_access_groups[[:space:]]*=[[:space:]]*).*#\1${user}#" "$conf"
     # 断言：改完必须能读回，且仍然是一个 key = value 形式的行

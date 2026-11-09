@@ -32,7 +32,7 @@ RFS = os.environ.get("RFS", "")
 RUN = os.environ.get("RUN", "/tmp")
 STATE = os.environ.get("STATE", os.path.join(os.path.dirname(RUN.rstrip("/")), "state"))
 SOCK_PATH = os.environ.get("SOCK_PATH", "")   # 面板入口用的 unix socket（$TRIM_APPDEST/app.sock）
-PREFIX = os.environ.get("GATE_PREFIX", "/app/raidview")  # 面板把 /app/<name> 反代到本 socket
+PREFIX = os.environ.get("GATE_PREFIX", "/app/LSI-Storage-Fnos")  # 面板把 /app/<name> 反代到本 socket
 APP_CMD = os.environ.get("APP_CMD", "")     # cmd/main 的绝对路径，用于 set-password
 SETUP_MARK = os.path.join(STATE, "credential-setup-done")
 SETUP_LOCK = os.path.join(STATE, "setup-in-progress")
@@ -57,8 +57,8 @@ def strip_prefix(path):
 
     除了配置里那个前缀，还兜底剥掉任意 /app/<某个名字> 前缀——
     因为应用名有可能因为安装路径不同而被算错（真实踩过：
-    安装钩子在暂存目录里跑，应用名成了 raidview-0.1.9-tpk，
-    结果面板访问 /app/raidview/ 全部 404）。多一层兜底就不会再因此挂掉。
+    安装钩子在暂存目录里跑，应用名成了 LSI-Storage-Fnos-0.1.9-tpk，
+    结果面板访问 /app/LSI-Storage-Fnos/ 全部 404）。多一层兜底就不会再因此挂掉。
     """
     for pre in (PREFIX, PREFIX.rstrip("/")):
         if pre and (path == pre or path.startswith(pre + "/")):
@@ -129,16 +129,16 @@ def need_setup():
 
 
 def current_account():
-    """当前账号名（存在 $VAR/config.json 里）。默认 raidview。"""
+    """当前账号名（存在 $VAR/config.json 里）。默认 LSI-Storage-Fnos。"""
     try:
         cfg = os.path.join(os.path.dirname(STATE.rstrip("/")), "config.json")
         with open(cfg, encoding="utf-8") as f:
-            return (json.load(f) or {}).get("account") or "raidview"
+            return (json.load(f) or {}).get("account") or "lsiadmin"
     except Exception:
-        return "raidview"
+        return "lsiadmin"
 
 
-def apply_password(pw, account="raidview"):
+def apply_password(pw, account="lsiadmin"):
     """把口令交给 cmd/main set-password（经 stdin，不进 argv、不进日志）。"""
     if not APP_CMD or not os.access(APP_CMD, os.X_OK):
         log("set-password entry missing: %r" % (APP_CMD,))
@@ -233,13 +233,13 @@ def load_html(name="index.html"):
 
 
 class H(BaseHTTPRequestHandler):
-    server_version = "raidview-gate/1.0"
+    server_version = "LSI-Storage-Fnos-gate/1.0"
 
     def log_message(self, fmt, *args):
         log("%s %s" % (self.address_string(), fmt % args))
 
     def base(self):
-        """当前请求的挂载前缀：直连是 ""，经面板反代是 "/app/raidview"。"""
+        """当前请求的挂载前缀：直连是 ""，经面板反代是 "/app/LSI-Storage-Fnos"。"""
         p = self.path.split("?", 1)[0]
         if PREFIX and (p == PREFIX or p.startswith(PREFIX + "/")):
             return PREFIX
@@ -321,7 +321,7 @@ class H(BaseHTTPRequestHandler):
             self._send(409, "<!doctype html><meta charset=utf-8>"
                             "<body style=\"font-family:sans-serif;padding:40px\">"
                             "<h2>口令已设置</h2><p>如需重设，请在终端执行 "
-                            "<code>/var/apps/raidview/cmd/reset-password</code>。</p></body>",
+                            "<code>/var/apps/LSI-Storage-Fnos/cmd/reset-password</code>。</p></body>",
                        )
             return
         try:
@@ -333,7 +333,7 @@ class H(BaseHTTPRequestHandler):
             return
         raw = self.rfile.read(n).decode("utf-8", "replace")
         form = parse_qs(raw, keep_blank_values=True)
-        account = (form.get("account") or ["raidview"])[0].strip()
+        account = (form.get("account") or ["lsiadmin"])[0].strip()
         p1 = (form.get("p1") or [""])[0]
         p2 = (form.get("p2") or [""])[0]
         ack = (form.get("acknowledged") or [""])[0]
@@ -416,7 +416,7 @@ a.btn:hover{filter:brightness(1.08)}
 <ul>
   <li>LSA 首次登录<b>需要 20–40 秒</b>（本机实测约 31 秒），请耐心等待，<b>不要重复点提交</b>。</li>
   <li>如果提示 <b>Invalid Credentials</b>，先确认账号名与上面完全一致（区分大小写）。</li>
-  <li>忘记口令：在 fnOS 终端执行 <code>/var/apps/raidview/cmd/reset-password</code>，再重新打开应用。</li>
+  <li>忘记口令：在 fnOS 终端执行 <code>/var/apps/LSI-Storage-Fnos/cmd/reset-password</code>，再重新打开应用。</li>
 </ul>
 <a class="btn" href="enter">进入 RAID 管理界面</a>
 </div></body></html>""".replace("__ACCOUNT__", account)

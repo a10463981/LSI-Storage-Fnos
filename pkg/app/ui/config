@@ -1,14 +1,14 @@
 {
     ".url": {
-        "raidview.Application": {
+        "LSI-Storage-Fnos.Application": {
             "title": "MegaRAID 监控",
             "icon": "images/icon_{0}.png",
             "type": "iframe",
             "protocol": "",
-            "gatewayPrefix": "/app/raidview",
+            "gatewayPrefix": "/app/LSI-Storage-Fnos",
             "gatewaySocket": "app.sock",
             "port": "",
-            "url": "/app/raidview",
+            "url": "/app/LSI-Storage-Fnos",
             "allUsers": false,
             "control": {
                 "accessPerm": "readonly"

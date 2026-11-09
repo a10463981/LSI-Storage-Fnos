@@ -9,15 +9,15 @@
       {
         "type": "text",
         "field": "wizard_login_account",
-        "label": "登录账号名（留空 = raidview）",
-        "initValue": "raidview",
+        "label": "登录账号名（留空 = lsiadmin）",
+        "initValue": "lsiadmin",
         "rules": [
           {
             "pattern": "^$|^[a-z_][a-z0-9_-]{0,31}$",
             "message": "小写字母或下划线开头，只能含小写字母、数字、下划线、连字符，最长 32 位"
           }
         ],
-        "helpText": "留空则使用默认的 raidview。"
+        "helpText": "留空则使用默认的 lsiadmin。"
       },
       {
         "type": "password",
@@ -34,7 +34,7 @@
       },
       {
         "type": "tips",
-        "helpText": "忘记口令：在 fnOS 终端执行 /var/apps/raidview/cmd/reset-password，然后重新打开应用重设账号与口令。"
+        "helpText": "忘记口令：在 fnOS 终端执行 /var/apps/LSI-Storage-Fnos/cmd/reset-password，然后重新打开应用重设账号与口令。"
       }
     ]
   }

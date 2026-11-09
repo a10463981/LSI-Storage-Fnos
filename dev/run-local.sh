@@ -5,10 +5,10 @@
 #   sudo ./dev/run-local.sh /path/to/rootfs.tar.gz
 #   sudo ./dev/run-local.sh --stop
 #
-# 它把 rootfs 解到 /var/tmp/raidview-dev/rootfs，注入测试端口，起 LSA 与门户。
+# 它把 rootfs 解到 /var/tmp/lsi-storage-fnos-dev/rootfs，注入测试端口，起 LSA 与门户。
 # 所有挂载都在 launch.sh 的独立 mount 命名空间里，命名空间销毁自动卸载，零残留。
 set -u
-BASE=/var/tmp/raidview-dev
+BASE=/var/tmp/lsi-storage-fnos-dev
 RFS=$BASE/rootfs
 RUN=$BASE/run
 SRC_DIR=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)

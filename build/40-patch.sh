@@ -87,8 +87,8 @@ fi
 # 换来的是"不论平台用新标签页还是 iframe 打开，都能正常显示"。
 NGX2="$LSA/server/conf/nginx.conf"
 if grep -qE '^[[:space:]]*add_header[[:space:]]+X-Frame-Options' "$NGX2"; then
-    sed -i -E 's|^([[:space:]]*)(add_header[[:space:]]+X-Frame-Options.*)$|\1# \2  # disabled by raidview|' "$NGX2"
-  log 40 "补丁 3e：已注释掉 $(grep -cE 'disabled by raidview' "$NGX2") 处 X-Frame-Options"
+    sed -i -E 's|^([[:space:]]*)(add_header[[:space:]]+X-Frame-Options.*)$|\1# \2  # disabled by LSI-Storage-Fnos|' "$NGX2"
+  log 40 "补丁 3e：已注释掉 $(grep -cE 'disabled by LSI-Storage-Fnos' "$NGX2") 处 X-Frame-Options"
   report "- 补丁 3e: 移除 LSA 前端 X-Frame-Options（允许被 iframe 内嵌）"
 else
   log 40 "补丁 3e：nginx.conf 里没有 X-Frame-Options，跳过"
@@ -126,17 +126,17 @@ for f in "$LSA/bin/storelibdebug.txt" "$LSA/bin/storelibdebugit.txt"; do
 done
 
 # ---- 补丁 6：预置账号 ----
-if ! in_rfs "id raidview" >/dev/null 2>&1; then
-  in_rfs "useradd -m -u 2000 -s /bin/bash raidview" || die "useradd raidview 失败"
-  in_rfs "passwd -l raidview >/dev/null 2>&1 || true"
+if ! in_rfs "id lsiadmin" >/dev/null 2>&1; then
+  in_rfs "useradd -m -u 2000 -s /bin/bash lsiadmin" || die "useradd LSI-Storage-Fnos 失败"
+  in_rfs "passwd -l lsiadmin >/dev/null 2>&1 || true"
 fi
-in_rfs "id raidview" 2>/dev/null | sed 's/^/    /'
-report "- 账号: $(in_rfs 'id raidview' 2>/dev/null)"
+in_rfs "id lsiadmin" 2>/dev/null | sed 's/^/    /'
+report "- 账号: $(in_rfs 'id lsiadmin' 2>/dev/null)"
 
 # ---- 只读组（尽力而为，需在 fnOS 上实测是否生效）----
 if grep -qE '^[[:space:]]*readonly_access_groups' "$CONF" 2>/dev/null; then
-  sed -i -E 's#^([[:space:]]*readonly_access_groups[[:space:]]*=[[:space:]]*).*#\1raidview#' "$CONF"
-  ok "readonly_access_groups = raidview"
+  sed -i -E 's#^([[:space:]]*readonly_access_groups[[:space:]]*=[[:space:]]*).*#\1lsiadmin#' "$CONF"
+  ok "readonly_access_groups = lsiadmin"
 else
   warn "未发现 readonly_access_groups 字段（记为待实测项）"
 fi

@@ -15,7 +15,7 @@ rv_extract_rootfs || { echo "解包失败，安装未完成" >&2; exit 1; }
 # 缺省配置只在不存在时写入，升级不覆盖用户改动
 if [ ! -f "$CONF_FILE" ]; then
   cat > "$CONF_FILE" <<'EOF'
-# raidview 配置。改完需重启应用生效。
+# LSI-Storage-Fnos 配置。改完需重启应用生效。
 gate_port=2463
 front_port=2464
 EOF

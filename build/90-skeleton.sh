@@ -1,5 +1,5 @@
 #!/bin/bash
-# 骨架载荷：Ubuntu base + 依赖 + raidview 账号，**不含 LSA**。
+# 骨架载荷：Ubuntu base + 依赖 + LSI-Storage-Fnos 账号，**不含 LSA**。
 #
 # 用途：在没有 LSA 安装包的情况下，验证平台链路——
 #   打包 → 安装 → 解包 → chpasswd → 起停 → 零残留。
@@ -37,11 +37,11 @@ in_rfs "apt-get update" >/dev/null || die "apt update 失败"
 in_rfs "apt-get install -y --no-install-recommends libldap2 libsasl2-2 libaio1t64 libtinfo6 zlib1g libstdc++6 passwd" \
   >/dev/null || die "依赖安装失败"
 
-if ! in_rfs "id raidview" >/dev/null 2>&1; then
-  in_rfs "useradd -m -u 2000 -s /bin/bash raidview" || die "useradd 失败"
-  in_rfs "passwd -l raidview >/dev/null 2>&1 || true"
+if ! in_rfs "id lsiadmin" >/dev/null 2>&1; then
+  in_rfs "useradd -m -u 2000 -s /bin/bash lsiadmin" || die "useradd 失败"
+  in_rfs "passwd -l lsiadmin >/dev/null 2>&1 || true"
 fi
-log 90 "账号: $(in_rfs 'id raidview')"
+log 90 "账号: $(in_rfs 'id lsiadmin')"
 
 log 90 "清理"
 rm -rf "$RS"/var/lib/apt/lists/* "$RS"/var/cache/apt/archives/*.deb 2>/dev/null || true

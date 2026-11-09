@@ -1,4 +1,4 @@
-# 博通控制器管理（raidview）
+# 博通控制器管理（LSI-Storage-Fnos）
 
 > ## ⚠️ 非官方第三方集成包
 >
@@ -10,7 +10,7 @@
 
 > ## 📦 关于本项目的 fpk 安装包
 >
-> **`raidview-*.fpk` 内含 Broadcom LSA 的专有二进制**（LSA 的 deb 包、`/opt/lsi` 下的全部组件、Ubuntu rootfs）。
+> **`LSI-Storage-Fnos-*.fpk` 内含 Broadcom LSA 的专有二进制**（LSA 的 deb 包、`/opt/lsi` 下的全部组件、Ubuntu rootfs）。
 >
 > - 该 fpk 仅面向**个人使用**场景分发，用于在自己拥有的服务器上管理自己拥有的硬件。
 > - **它可能被 Broadcom Inc. 要求下架**，或由托管平台自行移除。若某天链接失效，属预期内。
@@ -30,8 +30,8 @@
 ## 下载与安装（从 Release 拿 fpk）
 
 ```bash
-sudo appcenter-cli install-fpk raidview-0.2.5.fpk
-sudo /var/apps/raidview/cmd/main start
+sudo appcenter-cli install-fpk LSI-Storage-Fnos-0.2.5.fpk
+sudo /var/apps/LSI-Storage-Fnos/cmd/main start
 ```
 
 也可以用 fnOS 应用中心的「手动安装 fpk」。
@@ -52,18 +52,18 @@ sudo /var/apps/raidview/cmd/main start
 
 ### 首次使用
 
-装完点开应用，**第一屏就是「设置登录口令」**：填账号名（默认 `raidview`，可改）+ 口令（≥8 位，两次一致）
+装完点开应用，**第一屏就是「设置登录口令」**：填账号名（默认 `LSI-Storage-Fnos`，可改）+ 口令（≥8 位，两次一致）
 → 勾选「我已记下」→ 提交 → **完成页会大字显示你的账号名，登录 LSA 时要填这个**。
 
 > **首次登录 LSA 需 20–40 秒**（实测 31 秒），期间无反馈属正常，**不要重复提交**。
 
-忘记口令：`sudo /var/apps/raidview/cmd/reset-password`，再重新打开应用重设。
+忘记口令：`sudo /var/apps/LSI-Storage-Fnos/cmd/reset-password`，再重新打开应用重设。
 
 ---
 
 # 以下为实现细节与踩坑记录
 
-# raidview · fnOS 内置 LSA 的 MegaRAID 监控应用
+# LSI-Storage-Fnos · fnOS 内置 LSA 的 MegaRAID 监控应用
 
 把 Broadcom LSI Storage Authority 的完整运行环境（Ubuntu 24.04 chroot）打进 fpk，
 装到 fnOS 上点开就能看到图形界面。**不依赖 storcli，不在别处另装 LSA，装完即用。**
@@ -115,7 +115,7 @@ make check      # 静态守卫：裸 umount -R / 对宿主路径 umount / 无命
 │ 这个账号只用于登录本应用内置的 RAID 管理界面，     │
 │ 与你的 fnOS 账号无关。                         │
 │                                             │
-│ 登录账号名  [raidview        ]                  │
+│ 登录账号名  [LSI-Storage-Fnos        ]                  │
 │ 小写字母/下划线开头，≤32 位，与 fnOS 账号无关      │
 │                                             │
 │ 口令（至少 8 位）        [………………] [显示]      │
@@ -133,7 +133,7 @@ make check      # 静态守卫：裸 umount -R / 对宿主路径 umount / 无命
 - 两次输入必须一致，**服务端会独立再校验一遍**（不信任前端）
 - 「生成一个」在**浏览器本地**用 `crypto.getRandomValues` 生成 16 位，不经服务器
 - 必须勾选「我已记下这个口令」才允许提交
-- 账号名**可自定义**（默认 `raidview`，规则 `^[a-z_][a-z0-9_-]{0,31}$`；应用内部账号，与 fnOS 账号无关）
+- 账号名**可自定义**（默认 `LSI-Storage-Fnos`，规则 `^[a-z_][a-z0-9_-]{0,31}$`；应用内部账号，与 fnOS 账号无关）
 - 提交后在 chroot 内建号（不存在时 `useradd`）并 `chpasswd` 设口令（明文只走 stdin），同步 `readonly_access_groups`，然后进入正常流程
 - **设置完成后不会再出现**：落标记 `$VAR/state/credential-setup-done`
 
@@ -143,17 +143,17 @@ make check      # 静态守卫：裸 umount -R / 对宿主路径 umount / 无命
 |---|---|
 | 提交 | `cmd/main set-password <account>`（账号走 argv 不敏感；口令走 stdin） |
 | 建号 | 在 **chroot 内** `useradd -M -s /bin/bash <account>`，不碰宿主 fnOS 的用户库 |
-| 只读组 | 同步把 `LSA.conf` 的 `readonly_access_groups` 改成该账号（改前备份 `LSA.conf.raidview.bak`，改后有格式断言） |
+| 只读组 | 同步把 `LSA.conf` 的 `readonly_access_groups` 改成该账号（改前备份 `LSA.conf.LSI-Storage-Fnos.bak`，改后有格式断言） |
 | 记录 | `$VAR/config.json` 记 `{"account": "..."}`（0600，不含口令） |
 | 升级 | `credential-setup-done` 已存在时**不动**既有账号，只在全新安装/重置时生效 |
 
 实测（`.15`）：自定义 `myraidadmin` → chroot 内建号成功（uid 2001）、口令哈希可复算、
-`readonly_access_groups = myraidadmin`；再改回 `raidview` 同样生效；`Bad Name`/`123abc`/`UPPER`/`-x` 全部 400。
+`readonly_access_groups = myraidadmin`；再改回 `LSI-Storage-Fnos` 同样生效；`Bad Name`/`123abc`/`UPPER`/`-x` 全部 400。
 
 ### 忘记口令
 
 ```bash
-sudo /var/apps/raidview/cmd/reset-password
+sudo /var/apps/LSI-Storage-Fnos/cmd/reset-password
 ```
 它会清掉口令状态并把账号重新锁上；重新打开 `http://<本机IP>:2463/` 就会**再次进入设置页**，由你自己设一个新的（不是再发一个随机串）。
 
@@ -173,7 +173,7 @@ sudo /var/apps/raidview/cmd/reset-password
 ```
 [1] need_setup=true      / = 设置登录口令        ← 装完第一屏就是它
 [2] POST /setup → 303    need_setup=false       ← 设完立即进入正常流程
-    账号: raidview P ...                        ← P = 口令已生效
+    账号: LSI-Storage-Fnos P ...                        ← P = 口令已生效
 [3] 停止再启动            / = RAID 监控           ← 重启后不再出现设置页
 [4] reset-password       / = 设置登录口令        ← 账号状态 L（已锁）
 [5] 重设 → 303           need_setup=false       ← 可反复重置
@@ -197,7 +197,7 @@ definitely-wrong -> no
 
 | 项 | 结果 |
 |---|---|
-| `fnpack build` | 通过，产物 `raidview.fpk` = **103 MB** |
+| `fnpack build` | 通过，产物 `LSI-Storage-Fnos.fpk` = **103 MB** |
 | `appcenter-cli install-fpk` | 通过，rootfs 展开 254 MB |
 | `cmd/main start` | rc=0，门户 :2463 立即监听 |
 | 冷启动到 READY | **18–25 秒**（无卡机器） |
@@ -209,7 +209,7 @@ definitely-wrong -> no
 | `cmd/reset-password` | 通过，重设后门户再次展示 |
 | `cmd/main stop` | rc=0，进程/挂载/端口三项归零 |
 | 5 轮启停 | 5/5 全部 `start=0 stop=0 gate=200 残留(0/0/0)` |
-| `appcenter-cli uninstall` | 通过，`/var/apps/raidview` **与** `@appdata/raidview`(268MB) 全部清除 |
+| `appcenter-cli uninstall` | 通过，`/var/apps/LSI-Storage-Fnos` **与** `@appdata/LSI-Storage-Fnos`(268MB) 全部清除 |
 | 升级钩子（直接驱动） | 坏载荷 → 回滚成功、rootfs 仍可用；好载荷 → 替换成功、回滚点清理 |
 | `appcenter-cli` 升级 | **无 upgrade 命令**；`install-fpk` 对已装应用是 no-op（同版本/高版本都一样） |
 | CPU 预检 | 正确识别 `Common KVM processor`（无 AVX）并在安装期通过 |
@@ -273,7 +273,7 @@ base 里已经不含 `/opt/lsi/LSA/libs` —— 而 LSA 自带的 OpenSSL 3.2 �
 ## 4. 目录树
 
 ```
-raidview/
+LSI-Storage-Fnos/
 ├── Makefile                   image / skeleton / pkg / clean
 ├── build/
 │   ├── lib.sh                 版本钉（rootfs SHA256、LSA 基线）、chroot 封装、构建报告
@@ -315,23 +315,23 @@ raidview/
 | **3d** | `libldap-2.4.so.2 → libldap.so.2` | gcc_8.3.x 基线需要，见 §3.2 |
 | 4 | 8 处端口占位符替换 | 绕过交互式安装器的代价 |
 | 5 | `log_level` 64 → 4 | 64 = FUNCTION_ENTRY，每行都落盘；4 = ERROR |
-| 6 | 预置 `raidview` 账号（锁定） | 仅作为默认值；用户在设置页改成别的名字时会动态 `useradd` |
+| 6 | 预置 `LSI-Storage-Fnos` 账号（锁定） | 仅作为默认值；用户在设置页改成别的名字时会动态 `useradd` |
 
 ---
 
 ## 6. manifest（INI 格式，实测）
 
 ```ini
-appname               = raidview
+appname               = LSI-Storage-Fnos
 version               = 0.1.3
 display_name          = MegaRAID 监控
 desc                  = ...
 platform              = x86
 source                = thirdparty
-maintainer            = raidview
-distributor           = raidview
+maintainer            = LSI-Storage-Fnos
+distributor           = LSI-Storage-Fnos
 desktop_uidir         = ui
-desktop_applaunchname = raidview.Application
+desktop_applaunchname = LSI-Storage-Fnos.Application
 service_port          = 2463
 checkport             = false
 os_min_version        = 1.2.0401
@@ -354,7 +354,7 @@ changelog             = ...
 mkdir -p build/vendor && cp 008.018.012.000_MR_7.38_LSA_Linux.zip build/vendor/
 
 make image     # 00→70
-make pkg       # 组装 + fnpack，产物 build/dist/raidview.fpk
+make pkg       # 组装 + fnpack，产物 build/dist/LSI-Storage-Fnos.fpk
 ```
 
 | 阶段 | 实测耗时 |
@@ -370,10 +370,10 @@ make pkg       # 组装 + fnpack，产物 build/dist/raidview.fpk
 部署：
 
 ```bash
-scp build/dist/raidview.fpk admin@<host>:/tmp/
+scp build/dist/LSI-Storage-Fnos.fpk admin@<host>:/tmp/
 ssh admin@<host>
-sudo appcenter-cli install-fpk /tmp/raidview.fpk
-sudo /var/apps/raidview/cmd/main start
+sudo appcenter-cli install-fpk /tmp/LSI-Storage-Fnos.fpk
+sudo /var/apps/LSI-Storage-Fnos/cmd/main start
 curl -s http://127.0.0.1:2463/status
 ```
 
@@ -424,19 +424,19 @@ $ curl --unix-socket …/app.sock http://localhost/     → HTTP 302   ← 应�
 
 | 改动 | 内容 |
 |---|---|
-| `app/ui/config` | 改成 `type: iframe` + `gatewayPrefix: /app/raidview` + `gatewaySocket: app.sock` + `url: /app/raidview` |
+| `app/ui/config` | 改成 `type: iframe` + `gatewayPrefix: /app/LSI-Storage-Fnos` + `gatewaySocket: app.sock` + `url: /app/LSI-Storage-Fnos` |
 | `gate.py` | 额外监听 unix socket `$TRIM_APPDEST/app.sock`（`socketserver.ThreadingUnixStreamServer`，mode 600） |
-| `gate.py` | 路径前缀处理：经面板进来时路径是 `/app/raidview/...`，先剥前缀再路由；`/app/raidview` 无尾斜杠时 302 补斜杠（否则相对链接解析错） |
-| 页面 | 所有链接/`fetch` 改成**相对路径**（`status`、`enter`、`setup`），这样直连 `/` 和经面板 `/app/raidview/` 都能正确解析 |
+| `gate.py` | 路径前缀处理：经面板进来时路径是 `/app/LSI-Storage-Fnos/...`，先剥前缀再路由；`/app/LSI-Storage-Fnos` 无尾斜杠时 302 补斜杠（否则相对链接解析错） |
+| 页面 | 所有链接/`fetch` 改成**相对路径**（`status`、`enter`、`setup`），这样直连 `/` 和经面板 `/app/LSI-Storage-Fnos/` 都能正确解析 |
 | 端口 | `service_port = 2463` 保留，**直连端口照旧可用** |
 
 **实测**：
 
 ```
-$ ls -l /vol1/@appcenter/raidview/app.sock
+$ ls -l /vol1/@appcenter/LSI-Storage-Fnos/app.sock
 srw------- 1 root root 0
-$ curl --unix-socket /vol1/@appcenter/raidview/app.sock http://localhost/   → HTTP 200   ← 我们自己的页面
-$ curl http://127.0.0.1:5666/app/raidview/                                  → HTTP 200 「invalid token」
+$ curl --unix-socket /vol1/@appcenter/LSI-Storage-Fnos/app.sock http://localhost/   → HTTP 200   ← 我们自己的页面
+$ curl http://127.0.0.1:5666/app/LSI-Storage-Fnos/                                  → HTTP 200 「invalid token」
 $ curl http://127.0.0.1:5666/app/mail-archiver-fnos/                        → HTTP 200 「invalid token」  ← 对照，同款响应
 $ curl http://127.0.0.1:2463/                                               → HTTP 200   ← 直连仍然可用
 ```
@@ -451,16 +451,16 @@ $ curl http://127.0.0.1:2463/                                               → 
 定位方法：把每一层都打一遍，看谁会说 "not found"。
 
 ```
-$ curl -s -i --unix-socket …/app.sock http://localhost/app/raidview/ | head -1
+$ curl -s -i --unix-socket …/app.sock http://localhost/app/LSI-Storage-Fnos/ | head -1
 HTTP/1.0 404 Not Found
-$ curl -s --unix-socket …/app.sock http://localhost/app/raidview/ | tail -1
+$ curl -s --unix-socket …/app.sock http://localhost/app/LSI-Storage-Fnos/ | tail -1
 not found                      ← 和用户看到的字符串一模一样
 ```
 
 **根因**：`install_callback` 运行在平台的**安装暂存目录**里
-（`/vol1/appcenter-downloads/raidview-0.2.1-tpk/`），那一刻
-`basename(dirname(cmd))` 得到的应用名是 `raidview-0.2.1-tpk`，于是
-`GATE_PREFIX` 被算成 `/app/raidview-0.2.1-tpk`。面板转发过来的是 `/app/raidview/`，
+（`/vol1/appcenter-downloads/LSI-Storage-Fnos-0.2.1-tpk/`），那一刻
+`basename(dirname(cmd))` 得到的应用名是 `LSI-Storage-Fnos-0.2.1-tpk`，于是
+`GATE_PREFIX` 被算成 `/app/LSI-Storage-Fnos-0.2.1-tpk`。面板转发过来的是 `/app/LSI-Storage-Fnos/`，
 前缀对不上 → 落到路由的 else 分支 → 我们自己的 404，正文就是 `not found`。
 
 **三层修复**：
@@ -475,12 +475,12 @@ not found                      ← 和用户看到的字符串一模一样
 **实测（完整模拟用户：卸载 → 安装 → 不碰任何命令 → 等 40 秒）**：
 
 ```
-gate 前缀: GATE_PREFIX=/app/raidview          ← 正确
+gate 前缀: GATE_PREFIX=/app/LSI-Storage-Fnos          ← 正确
 socket   : srw------- root root
-面板路径 : :5666/app/raidview/        → 200
-          :5666/app/raidview/status   → 200
+面板路径 : :5666/app/LSI-Storage-Fnos/        → 200
+          :5666/app/LSI-Storage-Fnos/status   → 200
 直连     : :2463/                     → 200
-socket   : /app/raidview/  → 200   /app/raidview/status → 200
+socket   : /app/LSI-Storage-Fnos/  → 200   /app/LSI-Storage-Fnos/status → 200
 ```
 
 > 注意：未登录的 curl 访问面板路径仍会看到 `invalid token`（面板 broker 的鉴权门，
@@ -550,7 +550,7 @@ broker 拿到之后把 `X-Trim-Username`、`X-Trim-Isadmin` 这些**HTTP 头**�
 #### 因此
 
 - **默认关闭**，不提供开关（避免"开了但没人验证过只读"的假安全）。
-- 已经做了一件低风险的事：面板入口（`/app/raidview/*`）现在能正常工作，用户点图标后
+- 已经做了一件低风险的事：面板入口（`/app/LSI-Storage-Fnos/*`）现在能正常工作，用户点图标后
   看到的是设置页/预热页，登录 LSA 仍需输入一次口令（浏览器可记住）。
 - 若将来要做，实现路径与前置条件写在这里：① 真卡环境验证 `readonly_access_groups` 确实拦住写操作；
   ② gate 读取 `X-Trim-Username`/`X-Trim-Isadmin` 做身份判定；③ 口令改为可逆存储并加会话代理；
@@ -588,7 +588,7 @@ GET  /1.0/servers/<displayId>/login   = 5129 ms
 | 场景 | 做法 | 结果 |
 |---|---|---|
 | 2 | 安装（不走向导）→ 自动拉起并 READY → `/setup` 设 `t1` → 浏览器真实登录 | ✅ 进入 "Select Controller t1" |
-| 2' | 同上，但用**默认账号名** `raidview` | ✅ 进入 "Select Controller raidview" |
+| 2' | 同上，但用**默认账号名** `LSI-Storage-Fnos` | ✅ 进入 "Select Controller LSI-Storage-Fnos" |
 | 2'' | 设完后**完整重启**（stop→start）再登录 | ✅ 仍然成功 |
 | 3 | 卸载 → 全新安装 → `/setup` 设 `scen3user` → 登录 | ✅ 进入 "Select Controller scen3user" |
 
@@ -599,7 +599,7 @@ WARMING 期间重启的时序风险，而收益是零）。
 目前最可能的两个解释（尚未被用户侧证据确认）：
 
 1. **版本差异**：用户当时装的可能是 0.1.x / 早期 0.2.x，那些版本的 `/setup` 流程与现在不同。
-2. **账号名不一致**：设置时改了账号名，登录时却按默认的 `raidview` 输入。
+2. **账号名不一致**：设置时改了账号名，登录时却按默认的 `LSI-Storage-Fnos` 输入。
    → 0.2.4 的完成页把账号名用大字显示出来，正是为了避免这个。
 
 如果再次遇到，按这个顺序二分：
@@ -611,19 +611,19 @@ WARMING 期间重启的时序风险，而收益是零）。
 0.2.4 起内置只读审计脚本：
 
 ```bash
-sudo /var/apps/raidview/cmd/audit-residue
+sudo /var/apps/LSI-Storage-Fnos/cmd/audit-residue
 ```
 
 **实测（`.15`，真实卸载后跑）**：
 
 ```
-/var/apps/raidview            不存在          ← 平台删除
-/vol1/@appcenter/raidview     不存在          ← 67M，已清理
-/vol1/@appdata/raidview       不存在          ← 172M，我们在 uninstall_callback 里删
-/vol1/@apptemp/raidview       不存在
-/vol1/@appconf/raidview       存在  4.0K      ← 平台保留（应用配置元数据）
-/vol1/@apphome/raidview       存在  0         ← 平台保留（空目录）
-/vol1/@appmeta/raidview       存在  0         ← 平台保留（应用元数据）
+/var/apps/LSI-Storage-Fnos            不存在          ← 平台删除
+/vol1/@appcenter/LSI-Storage-Fnos     不存在          ← 67M，已清理
+/vol1/@appdata/LSI-Storage-Fnos       不存在          ← 172M，我们在 uninstall_callback 里删
+/vol1/@apptemp/LSI-Storage-Fnos       不存在
+/vol1/@appconf/LSI-Storage-Fnos       存在  4.0K      ← 平台保留（应用配置元数据）
+/vol1/@apphome/LSI-Storage-Fnos       存在  0         ← 平台保留（空目录）
+/vol1/@appmeta/LSI-Storage-Fnos       存在  0         ← 平台保留（应用元数据）
 端口 2463/2464/41000/427      全部空闲
 来自 chroot 的进程            无
 挂载残留                      0

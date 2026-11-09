@@ -20,8 +20,8 @@ mkdir -p "$RFS/opt/lsi/LSIStorageAuthority/logs" "$RFS/run"
   echo "lsa_baseline=${LSA_BASELINE}"
   echo "built_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   echo "built_on=$(hostname)"
-} > "$RFS/etc/raidview-build"
-log 70 "构建指纹: $(tr '\n' ' ' < "$RFS/etc/raidview-build")"
+} > "$RFS/etc/lsi-storage-fnos-build"
+log 70 "构建指纹: $(tr '\n' ' ' < "$RFS/etc/lsi-storage-fnos-build")"
 
 log 70 "打包 rootfs（gzip -6，可重复：排序+固定 mtime/owner）"
 tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner \

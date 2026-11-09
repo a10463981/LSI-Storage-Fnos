@@ -1,4 +1,4 @@
-# raidview —— 内置 LSA 的 fnOS RAID 监控应用
+# LSI-Storage-Fnos —— 内置 LSA 的 fnOS RAID 监控应用
 #
 #   make image      构建 rootfs 载荷（需要 root + 网络 + LSA 安装包）
 #   make skeleton   构建骨架 rootfs（不含 LSA，仅用于验证平台链路）

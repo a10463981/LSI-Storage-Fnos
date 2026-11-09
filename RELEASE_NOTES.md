@@ -1,4 +1,4 @@
-# 博通控制器管理（raidview）0.2.5
+# 博通控制器管理（LSI-Storage-Fnos）0.2.5
 
 > **非官方第三方集成包**，与 Broadcom Inc. 无隶属关系，未获其授权或背书。
 > Broadcom、LSI、MegaRAID、LSI Storage Authority 是 Broadcom Inc. 的商标或注册商标。
@@ -13,8 +13,8 @@
 
 ```bash
 # 传到 fnOS 上
-sudo appcenter-cli install-fpk raidview-0.2.5.fpk
-sudo /var/apps/raidview/cmd/main start
+sudo appcenter-cli install-fpk LSI-Storage-Fnos-0.2.5.fpk
+sudo /var/apps/LSI-Storage-Fnos/cmd/main start
 ```
 
 也可以走 fnOS 应用中心的「手动安装 fpk」。
@@ -37,7 +37,7 @@ sudo /var/apps/raidview/cmd/main start
 
 装完点开应用，**第一屏就是「设置登录口令」**：
 
-1. 账号名（默认 `raidview`，可自定义；小写字母或下划线开头，≤32 位）
+1. 账号名（默认 `LSI-Storage-Fnos`，可自定义；小写字母或下划线开头，≤32 位）
 2. 口令（≥8 位，两次一致）
 3. 勾选「我已记下这个口令」→ 提交
 
@@ -45,8 +45,8 @@ sudo /var/apps/raidview/cmd/main start
 
 > **首次登录 LSA 需 20–40 秒**（本机实测 31 秒），期间界面无反馈是正常的，**请勿重复提交**。
 
-忘记口令：`sudo /var/apps/raidview/cmd/reset-password`，再重新打开应用重设。
-卸载残留自查：`sudo /var/apps/raidview/cmd/audit-residue`。
+忘记口令：`sudo /var/apps/LSI-Storage-Fnos/cmd/reset-password`，再重新打开应用重设。
+卸载残留自查：`sudo /var/apps/LSI-Storage-Fnos/cmd/audit-residue`。
 
 ---
 
@@ -97,7 +97,7 @@ cp 008.018.012.000_MR_7.38_LSA_Linux.zip build/vendor/
 
 # 2. 构建
 make image && make pkg
-# 产物 build/dist/raidview.fpk
+# 产物 build/dist/LSI-Storage-Fnos.fpk
 ```
 
 需要 x86_64 Linux、root、能访问清华 TUNA 镜像、`fnpack`（fnOS 官方打包工具）。

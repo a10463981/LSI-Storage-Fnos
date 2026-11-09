@@ -4,22 +4,22 @@
 
 1. `fnpack create <name> -t native` 生成的官方最低模板（本机 fnpack 1.2.4 实跑）
 2. 8 个已装应用的真实 manifest（.15 上 `cat /var/apps/*/manifest`）
-3. 我们自己的 `raidview.fpk` 已用这套字段 **构建成功并安装运行**（.15 实测）
+3. 我们自己的 `LSI-Storage-Fnos.fpk` 已用这套字段 **构建成功并安装运行**（.15 实测）
 
 ## manifest 字段逐个标注
 
 | 字段 | 值 | 状态 | 依据 |
 |---|---|---|---|
-| `appname` | raidview | ✅ 实测 | 模板必填 |
+| `appname` | LSI-Storage-Fnos | ✅ 实测 | 模板必填 |
 | `version` | 0.1.3 | ✅ 实测 | 模板必填；同版本重复安装不会替换文件 |
 | `display_name` | MegaRAID 监控 | ✅ 实测 | 模板必填 |
 | `desc` | … | ✅ 实测 | 模板必填 |
 | `platform` | x86 | ✅ 实测 | 模板必填 |
 | `source` | thirdparty | ✅ 实测 | 模板必填 |
-| `maintainer` | raidview | ✅ 实测 | 模板必填 |
-| `distributor` | raidview | ✅ 实测 | 模板必填 |
+| `maintainer` | LSI-Storage-Fnos | ✅ 实测 | 模板必填 |
+| `distributor` | LSI-Storage-Fnos | ✅ 实测 | 模板必填 |
 | `desktop_uidir` | ui | ✅ 实测 | 模板必填；对应 `app/ui/` |
-| `desktop_applaunchname` | raidview.Application | ✅ 实测 | 必须与 `app/ui/config` 的 `.url` 键逐字符相同 |
+| `desktop_applaunchname` | LSI-Storage-Fnos.Application | ✅ 实测 | 必须与 `app/ui/config` 的 `.url` 键逐字符相同 |
 | `service_port` | 2463 | ✅ 实测 | 两个真实应用用过；我们的安装运行也验证了 |
 | `checkport` | false | ✅ 实测 | 平台不替我们探端口，端口冲突要自己处理 |
 | `os_min_version` | 1.2.0401 | ⚠️ 推测 | 取自 mail-archiver-fnos 的已装值，未在更低版本上验证 |
@@ -64,7 +64,7 @@ fnpack 会解析这个文件，**必须是合法 JSON**，否则构建直接失�
 ```json
 {
     ".url": {
-        "raidview.Application": {
+        "LSI-Storage-Fnos.Application": {
             "title": "MegaRAID 监控",
             "icon": "images/icon_{0}.png",
             "type": "url",

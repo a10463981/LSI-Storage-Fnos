@@ -2,7 +2,7 @@
 # 卸载残留审计（只读，不删除任何东西）
 # 用途：卸载前后各跑一次，确认平台与我们都清干净了。
 set -u
-APP=${RV_APPNAME:-raidview}
+APP=${RV_APPNAME:-LSI-Storage-Fnos}
 [ -n "${1:-}" ] && APP=$1
 
 printf '%-46s %-10s %s\n' "位置" "状态" "大小/备注"
@@ -30,7 +30,7 @@ echo "=== 三、运行时残留 ==="
 for f in "/var/run/$APP.sock" "/run/$APP.sock" "/var/run/$APP.pid"; do
   chk "$f"
 done
-ls -d /tmp/${APP}* /tmp/*raidview* 2>/dev/null | while read -r t; do chk "$t" "临时物"; done
+ls -d /tmp/${APP}* /tmp/*LSI-Storage-Fnos* 2>/dev/null | while read -r t; do chk "$t" "临时物"; done
 echo
 echo "=== 四、端口占用（2463 门户 / 2464 LSA / 41000 后端 / 427 SLP）==="
 for p in 2463 2464 41000 427; do
