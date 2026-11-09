@@ -5,6 +5,8 @@
 在 fnOS 上装一个应用，点开就是 Broadcom LSI Storage Authority（LSA）的图形界面，用来查看
 MegaRAID 阵列卡的状态。不用 storcli，不用在外网另找一台机器装管理端，也不用动你系统里的软件包。
 
+> 姊妹项目：Debian / PVE 版本见 [LSI-Storage-PVE v0.1.03](https://github.com/a10463981/LSI-Storage-PVE)。
+
 ![界面预览](docs/screenshots/screenshot-1.png)
 
 ![控制器与磁盘](docs/screenshots/screenshot-3.png)
