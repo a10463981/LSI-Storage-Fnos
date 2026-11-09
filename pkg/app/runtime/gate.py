@@ -15,6 +15,8 @@ LSA 自带前端拿到 400 就放弃渲染 → 用户看到灰屏，以为坏了
 仅依赖标准库，零构建。
 """
 import json
+import glob
+import shutil
 import os
 import re
 import signal
@@ -119,6 +121,188 @@ def probe_api():
         return None
 
 
+
+# ==================== 运维：环境检测 / 重启 ====================
+# 只读检测 + 白名单动作（重启）。绝不 umount、绝不 pkill、绝不动宿主路径。
+SYMLINKS = [
+    ("/usr/lib/x86_64-linux-gnu/libcrypt.so.2", "libcrypt 2.4 soname"),
+    ("/usr/lib/x86_64-linux-gnu/libldap-2.4.so.2", "libldap 2.4 soname"),
+    ("/opt/lsi/LSA/libs2/libslp.so.1", "SLP 库"),
+]
+LSA_BIN = "/opt/lsi/LSIStorageAuthority/bin/LSA"
+RESTART_LOCK = os.path.join(RUN, "restart.lock")
+LOG_FATALS = ("Library load failed", "OPENSSL_3.2", "libgateway")
+
+
+def _in(p):
+    return os.path.join(RFS, p.lstrip("/"))
+
+
+def _tcp_open(port, timeout=1.0):
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=timeout):
+            return True
+    except Exception:
+        return False
+
+
+def _mem_avail_mb():
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) // 1024
+    except Exception:
+        pass
+    return -1
+
+
+def _lsa_api():
+    t0 = time.time()
+    try:
+        c = http.client.HTTPConnection("127.0.0.1", FRONT_PORT, timeout=5)
+        c.request("GET", "/LSI/Storage/MR/API/1.0/")
+        r = c.getresponse()
+        r.read(200)
+        c.close()
+        return r.status, int((time.time() - t0) * 1000)
+    except Exception:
+        return None, int((time.time() - t0) * 1000)
+
+
+def _log_hits():
+    base = _in("/opt/lsi/LSIStorageAuthority/logs")
+    hits = []
+    files = sorted(glob.glob(os.path.join(base, "*.txt")),
+                   key=lambda x: -os.path.getmtime(x) if os.path.exists(x) else 0)[:3]
+    for fp in files:
+        try:
+            with open(fp, encoding="utf-8", errors="replace") as f:
+                tail = f.readlines()[-300:]
+        except Exception:
+            continue
+        for line in tail:
+            for pat in LOG_FATALS:
+                if pat in line:
+                    hits.append(pat)
+                    break
+    return sorted(set(hits))
+
+
+def op_check():
+    items = []
+
+    def add(cid, name, status, detail, fix=""):
+        items.append({"id": cid, "name": name, "status": status, "detail": detail, "fix": fix})
+
+    # 1 rootfs + 主程序
+    if not RFS or not os.path.isdir(RFS) or not os.path.exists(_in("/etc/os-release")):
+        add("rootfs", "运行环境", "fail", "rootfs 缺失或不完整", "重新安装应用")
+    elif not os.path.exists(_in(LSA_BIN)):
+        add("rootfs", "运行环境", "fail", "rootfs 在，但缺少 LSA 主程序", "重新安装应用")
+    else:
+        add("rootfs", "运行环境", "ok", "rootfs 与 LSA 主程序就位")
+
+    # 2 符号链接
+    missing = []
+    for target, desc in SYMLINKS:
+        p = _in(target)
+        if not (os.path.islink(p) and os.path.exists(p)) and not os.path.exists(p):
+            missing.append(desc)
+    if missing:
+        add("symlinks", "库符号链接", "fail", "缺失：%s" % "、".join(missing), "重新安装应用可恢复")
+    else:
+        add("symlinks", "库符号链接", "ok", "3 处 soname 链接齐全")
+
+    # 3 控制器
+    dev = os.path.exists("/dev/megaraid_sas_ioctl_node")
+    mod = os.path.isdir("/sys/module/megaraid_sas")
+    if dev and mod:
+        add("dev", "控制器与驱动", "ok", "设备节点与 megaraid_sas 模块都在")
+    elif not dev and not mod:
+        add("dev", "控制器与驱动", "warn", "无 /dev/megaraid_sas_ioctl_node，megaraid_sas 也未加载",
+            "确认 RAID 卡已插好或整卡直通给本机")
+    else:
+        add("dev", "控制器与驱动", "warn",
+            "设备节点%s，模块%s" % ("在" if dev else "缺", "已加载" if mod else "未加载"),
+            "缺一侧通常意味着卡未直通或驱动未装")
+
+    # 4 端口
+    bad = [str(p) for p in (GATE_PORT, FRONT_PORT, 41000) if not _tcp_open(p)]
+    if bad:
+        add("ports", "端口监听", "fail", "未监听：%s" % ", ".join(bad), "点「重启管理服务」重试")
+    else:
+        add("ports", "端口监听", "ok", "%d/%d/41000 均在监听" % (GATE_PORT, FRONT_PORT))
+
+    # 5 磁盘 / 内存
+    try:
+        free_mb = shutil.disk_usage(os.path.dirname(STATE) or "/").free // (1024 * 1024)
+        add("disk", "磁盘空间", "ok" if free_mb >= 1024 else "warn",
+            "数据卷剩余 %d MB" % free_mb, "" if free_mb >= 1024 else "LSA 需要 ≥1GB 余量")
+    except Exception as e:
+        add("disk", "磁盘空间", "warn", "读取失败：%r" % (e,))
+    ma = _mem_avail_mb()
+    add("mem", "可用内存", "ok" if ma >= 512 else "warn",
+        ("可用 %d MB" % ma) if ma >= 0 else "读取失败",
+        "" if ma >= 512 else "释放内存后重启服务")
+
+    # 6 LSA 接口
+    code, ms = _lsa_api()
+    if code == 200:
+        add("api", "LSA 接口", "ok", "HTTP 200，耗时 %d ms" % ms)
+    elif code is None:
+        add("api", "LSA 接口", "fail", "连接失败（%d ms）" % ms, "点「重启管理服务」重试")
+    else:
+        add("api", "LSA 接口", "warn", "HTTP %s，耗时 %d ms（预热中通常为 400）" % (code, ms))
+
+    # 7 日志
+    hits = _log_hits()
+    if hits:
+        api_bad = any(i["id"] == "api" and i["status"] == "fail" for i in items)
+        add("logs", "日志检查", "fail" if api_bad else "warn",
+            "出现：%s" % "、".join(hits), "接口正常时可忽略历史记录；持续出现请重启服务")
+    else:
+        add("logs", "日志检查", "ok", "最近日志未见已知致命字样")
+
+    summary = {"ok": 0, "warn": 0, "fail": 0}
+    for it in items:
+        summary[it["status"]] = summary.get(it["status"], 0) + 1
+    return {"items": items, "summary": summary, "ts": int(time.time())}
+
+
+def _restart_in_progress():
+    try:
+        if not os.path.exists(RESTART_LOCK):
+            return False
+        if time.time() - os.path.getmtime(RESTART_LOCK) > 180:
+            os.unlink(RESTART_LOCK)
+            return False
+        return True
+    except Exception:
+        return False
+
+
+def _do_restart():
+    try:
+        subprocess.Popen([APP_CMD, "restart"], stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+    except Exception as e:
+        log("restart spawn failed: %r" % (e,))
+
+
+def _spawn_restart():
+    if _restart_in_progress():
+        return False
+    try:
+        with open(RESTART_LOCK, "w") as f:
+            f.write(str(int(time.time())))
+    except Exception:
+        pass
+    # 先把响应送回浏览器，再动服务（否则连接会被切断）
+    threading.Timer(1.5, _do_restart).start()
+    return True
+
+
 def need_setup():
     """还没设过登录口令 -> 必须先走设置页。
 
@@ -212,6 +396,7 @@ def compute():
         "lsa_alive": lsa_pid_alive(),
         "need_setup": need_setup(),
         "account": current_account(),
+        "restarting": _restart_in_progress(),
     }
 
 
@@ -280,6 +465,9 @@ class H(BaseHTTPRequestHandler):
         elif path in ("/status", "/api/status"):
             self._send(200, json.dumps(compute(), ensure_ascii=False),
                        "application/json; charset=utf-8")
+        elif path == "/op/check":
+            self._send(200, json.dumps(op_check(), ensure_ascii=False).encode("utf-8"),
+                       "application/json; charset=utf-8")
         elif path == "/enter":
             if need_setup():
                 self._send(302, b"", extra={"Location": self.base() + "/"})
@@ -309,6 +497,12 @@ class H(BaseHTTPRequestHandler):
         # 唯一允许的写操作：提交登录口令。只写本应用自己的状态与 chroot 内的账号，
         # 不触碰阵列、不触碰 fnOS 系统配置。
         path = strip_prefix(self.path.split("?", 1)[0])
+        if path == "/op/restart":
+            ok = _spawn_restart()
+            self._send(202 if ok else 409,
+                       json.dumps({"ok": ok, "restarting": True}, ensure_ascii=False).encode("utf-8"),
+                       "application/json; charset=utf-8")
+            return
         if path == "/setup":
             self.handle_setup()
             return
@@ -498,6 +692,12 @@ class UnixHTTPServer(socketserver.ThreadingUnixStreamServer):
 
 def main():
     os.makedirs(RUN, exist_ok=True)
+    # 新门户起来 = 上次重启已完成，清掉标记
+    try:
+        if os.path.exists(RESTART_LOCK):
+            os.unlink(RESTART_LOCK)
+    except Exception:
+        pass
     log("gate start port=%d front=%d rfs=%s" % (GATE_PORT, FRONT_PORT, RFS))
     threading.Thread(target=pruner, daemon=True).start()
 

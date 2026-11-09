@@ -1,5 +1,5 @@
 appname               = LSI-Storage-Fnos
-version               = 0.1.01
+version               = 0.1.03
 display_name          = 博通控制器管理
 desc                  = <p><b>非官方第三方集成包，与 Broadcom Inc. 无隶属关系、未获其背书。</b></p><p>在本机内置 Broadcom LSI Storage Authority 运行环境，图形化查看 MegaRAID 虚拟盘与物理盘状态。只读，不提供任何写操作。</p>
 platform              = x86
@@ -13,4 +13,4 @@ desktop_applaunchname = LSI-Storage-Fnos.Application
 service_port          = 2463
 checkport             = false
 os_min_version        = 1.2.0401
-changelog             = 0.1.01: 首个正式版本。在 fnOS 上内置 Broadcom LSI Storage Authority 运行环境，提供图形化 MegaRAID 只读管理界面，无需 storcli、无需另装 LSA。支持本机与整卡直通的阵列卡；首启设置登录账号与口令（默认 lsiadmin，可自定义）；面板图标与直连端口两种入口。已知限制：仅在无卡环境完成验证，控制器枚举、虚拟盘/物理盘状态、重建进度、电池与事件信息待有卡环境确认。
+changelog             = 0.1.03: 门户新增「重启管理服务」（二次确认、幂等、带重启进度）与「重新检测环境」（7 项只读检查，加载时自动跑一次）。仍无任何自动跳转或自动刷新。
