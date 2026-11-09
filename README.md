@@ -2,6 +2,9 @@
 
 [English](README.en.md) | 中文
 
+GitHub: https://github.com/a10463981/LSI-Storage-Fnos ｜ Gitee: https://gitee.com/a10463981/LSI-Storage-Fnos
+
+
 在 fnOS 上装一个应用，点开就是 Broadcom LSI Storage Authority（LSA）的图形界面，用来查看
 MegaRAID 阵列卡的状态。不用 storcli，不用在外网另找一台机器装管理端，也不用动你系统里的软件包。
 

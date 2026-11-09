@@ -2,6 +2,9 @@
 
 English | [中文](README.md)
 
+GitHub: https://github.com/a10463981/LSI-Storage-Fnos ｜ Gitee: https://gitee.com/a10463981/LSI-Storage-Fnos
+
+
 A fnOS application that puts the Broadcom LSI Storage Authority (LSA) console one click away,
 so you can check on your MegaRAID controller without reaching for storcli, without standing up
 a separate management host, and without touching the packages on your system.
