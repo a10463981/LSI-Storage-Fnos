@@ -23,7 +23,7 @@
 把 Broadcom LSI Storage Authority（LSA）的完整运行环境（Ubuntu chroot）打进一个 fnOS 应用包，
 装完点开就是图形化的 MegaRAID 管理界面。**不需要 storcli，不需要在别处另装 LSA。**
 
-当前版本 **0.2.5**，已在真实 fnOS 上跑通：安装 → 启动 → 预热门 → 设置凭据 → 登录 → 停止零残留。
+当前版本 **0.1.01**，已在真实 fnOS 上跑通：安装 → 启动 → 预热门 → 设置凭据 → 登录 → 停止零残留。
 
 ---
 
